@@ -1,34 +1,33 @@
 import { useRef, useEffect, useState, useMemo } from "react";
-import { motion } from "framer-motion";
-import { Terminal, ArrowDownToLine, Filter } from "lucide-react";
+import { ArrowDownToLine, Filter } from "lucide-react";
 import type { DashboardEvent, DashboardEventType } from "@shared/types";
 
 interface EventLogProps {
   events: DashboardEvent[];
 }
 
-const typeColors: Record<string, string> = {
-  CREW_PLAN_STARTED: "bg-violet-500/20 text-violet-400",
-  CREW_PLAN_COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  CREW_PLAN_FAILED: "bg-rose-500/20 text-rose-400",
-  WAVE_STARTED: "bg-sky-500/20 text-sky-400",
-  WAVE_COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  WAVE_FAILED: "bg-rose-500/20 text-rose-400",
-  AGENT_REGISTERED: "bg-violet-500/20 text-violet-400",
-  AGENT_ACTIVE: "bg-sky-500/20 text-sky-400",
-  AGENT_COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  AGENT_FAILED: "bg-rose-500/20 text-rose-400",
-  AGENT_RETRYING: "bg-amber-500/20 text-amber-400",
-  TASK_SUBMITTED: "bg-gray-500/20 text-gray-400",
-  TASK_WORKING: "bg-sky-500/20 text-sky-400",
-  TASK_COMPLETED: "bg-emerald-500/20 text-emerald-400",
-  TASK_FAILED: "bg-rose-500/20 text-rose-400",
-  TASK_RETRYING: "bg-amber-500/20 text-amber-400",
-  ARTIFACT_PRODUCED: "bg-fuchsia-500/20 text-fuchsia-400",
-  BRIDGE_CONNECTED: "bg-emerald-500/20 text-emerald-400",
-  BRIDGE_DISCONNECTED: "bg-rose-500/20 text-rose-400",
-  METRICS_UPDATE: "bg-gray-500/20 text-gray-400",
-  STATE_SNAPSHOT: "bg-violet-500/20 text-violet-400",
+const typeColor: Record<string, string> = {
+  CREW_PLAN_STARTED: "text-violet-400",
+  CREW_PLAN_COMPLETED: "text-emerald-400",
+  CREW_PLAN_FAILED: "text-rose-400",
+  WAVE_STARTED: "text-violet-400",
+  WAVE_COMPLETED: "text-emerald-400",
+  WAVE_FAILED: "text-rose-400",
+  AGENT_REGISTERED: "text-gray-400",
+  AGENT_ACTIVE: "text-violet-400",
+  AGENT_COMPLETED: "text-emerald-400",
+  AGENT_FAILED: "text-rose-400",
+  AGENT_RETRYING: "text-amber-400",
+  TASK_SUBMITTED: "text-gray-500",
+  TASK_WORKING: "text-violet-400",
+  TASK_COMPLETED: "text-emerald-400",
+  TASK_FAILED: "text-rose-400",
+  TASK_RETRYING: "text-amber-400",
+  ARTIFACT_PRODUCED: "text-violet-400",
+  BRIDGE_CONNECTED: "text-emerald-400",
+  BRIDGE_DISCONNECTED: "text-rose-400",
+  METRICS_UPDATE: "text-gray-600",
+  STATE_SNAPSHOT: "text-gray-600",
 };
 
 function formatTimestamp(ts: number): string {
@@ -112,42 +111,40 @@ export function EventLog({ events }: EventLogProps) {
   }, [filtered, autoScroll]);
 
   return (
-    <div className="rounded-xl bg-gray-900/80 backdrop-blur-sm border border-gray-800/50 shadow-lg shadow-black/20 flex flex-col max-h-[300px]">
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-800/50 flex-shrink-0">
+    <div className="rounded-xl bg-gray-900 border border-gray-800 flex flex-col max-h-[280px]">
+      {/* Toolbar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Terminal className="w-3.5 h-3.5 text-gray-500" />
-          <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
-            Event Log
+          <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Console
           </h2>
-          <span className="text-[10px] text-gray-600 font-mono">
-            ({filtered.length})
+          <span className="text-[10px] text-gray-700 font-mono">
+            {filtered.length}
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <div className="relative">
             <button
               onClick={() => setShowFilter(!showFilter)}
-              className={`p-1.5 rounded-md transition-colors ${
-                filterType !== "ALL"
-                  ? "bg-violet-500/20 text-violet-400"
-                  : "text-gray-500 hover:text-gray-300"
+              className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+                filterType !== "ALL" ? "text-violet-400" : "text-gray-600 hover:text-gray-400"
               }`}
             >
-              <Filter className="w-3.5 h-3.5" />
+              <Filter className="w-3 h-3" />
             </button>
             {showFilter && (
-              <div className="absolute right-0 top-8 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 max-h-48 overflow-y-auto w-48">
+              <div className="absolute right-0 top-7 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 max-h-48 overflow-y-auto w-44">
                 <button
                   onClick={() => { setFilterType("ALL"); setShowFilter(false); }}
-                  className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 ${filterType === "ALL" ? "text-violet-400" : "text-gray-300"}`}
+                  className={`w-full text-left px-3 py-1 text-xs hover:bg-gray-700 ${filterType === "ALL" ? "text-violet-400" : "text-gray-400"}`}
                 >
-                  All Events
+                  All
                 </button>
                 {allEventTypes.map((t) => (
                   <button
                     key={t}
                     onClick={() => { setFilterType(t); setShowFilter(false); }}
-                    className={`w-full text-left px-3 py-1.5 text-xs hover:bg-gray-700 ${filterType === t ? "text-violet-400" : "text-gray-300"}`}
+                    className={`w-full text-left px-3 py-1 text-xs font-mono hover:bg-gray-700 ${filterType === t ? "text-violet-400" : "text-gray-500"}`}
                   >
                     {t}
                   </button>
@@ -157,47 +154,40 @@ export function EventLog({ events }: EventLogProps) {
           </div>
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`p-1.5 rounded-md transition-colors ${
-              autoScroll
-                ? "bg-violet-500/20 text-violet-400"
-                : "text-gray-500 hover:text-gray-300"
+            className={`w-6 h-6 rounded flex items-center justify-center transition-colors ${
+              autoScroll ? "text-violet-400" : "text-gray-600 hover:text-gray-400"
             }`}
           >
-            <ArrowDownToLine className="w-3.5 h-3.5" />
+            <ArrowDownToLine className="w-3 h-3" />
           </button>
         </div>
       </div>
 
+      {/* Log body */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-2 space-y-0.5 font-mono text-xs"
+        className="flex-1 overflow-y-auto px-4 py-1.5 font-mono text-[11px] leading-5"
       >
         {filtered.length === 0 ? (
-          <div className="text-center py-6 text-gray-600">
+          <div className="text-center py-6 text-gray-700">
             No events yet
           </div>
         ) : (
           filtered.map((event, i) => (
-            <motion.div
+            <div
               key={`${event.timestamp}-${event.type}-${i}`}
-              initial={{ opacity: 0, x: -5 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="flex items-center gap-2 py-0.5"
+              className="flex items-baseline gap-2"
             >
-              <span className="text-gray-600 flex-shrink-0 w-[70px]">
+              <span className="text-gray-700 flex-shrink-0 w-[62px]">
                 {formatTimestamp(event.timestamp)}
               </span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${
-                  typeColors[event.type] ?? "bg-gray-500/20 text-gray-400"
-                }`}
-              >
-                {event.type.replace(/_/g, " ")}
+              <span className={`flex-shrink-0 ${typeColor[event.type] ?? "text-gray-600"}`}>
+                {event.type}
               </span>
-              <span className="text-gray-400 truncate">
+              <span className="text-gray-500 truncate">
                 {summarize(event)}
               </span>
-            </motion.div>
+            </div>
           ))
         )}
       </div>

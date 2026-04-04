@@ -45,8 +45,10 @@ export function App() {
     reset();
   }, [reset]);
 
+  const isIdle = state.phase === "idle";
+
   return (
-    <div className="flex flex-col h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
       <Header
         phase={state.phase}
         isConnected={isConnected}
@@ -55,15 +57,19 @@ export function App() {
         onConnect={handleConnect}
         onSimulate={handleSimulate}
         onStop={handleStop}
+        completionPercent={completionPercent}
+        totalTasks={state.metrics.taskCount || state.tasks.length}
+        completedTasks={state.metrics.completedTasks}
       />
 
       <AnimatePresence mode="wait">
-        {state.phase === "idle" ? (
+        {isIdle ? (
           <motion.div
             key="hero"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
             className="flex-1 flex"
           >
             <HeroLanding
@@ -77,14 +83,15 @@ export function App() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="flex-1 overflow-auto p-4 space-y-4"
+            transition={{ duration: 0.3 }}
+            className="flex-1 overflow-auto p-4 space-y-3"
           >
-            <div className="grid grid-cols-12 gap-4">
-              <div className="col-span-8 space-y-4">
+            <div className="grid grid-cols-12 gap-3">
+              <div className="col-span-8 space-y-3">
                 <PlanView plan={state.plan} phase={state.phase} />
                 <WaveTimeline waves={state.waves} />
               </div>
-              <div className="col-span-4 space-y-4">
+              <div className="col-span-4 space-y-3">
                 <CrewBoard agents={state.agents} />
                 <MetricsBar
                   metrics={state.metrics}
