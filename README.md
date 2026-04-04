@@ -1,181 +1,358 @@
-<h1 align="center">ag-ui-crews</h1>
+<div align="center">
 
-<p align="center">
-  <strong>Mission control for your AI agent crews — real-time, in your browser.</strong>
-</p>
+# 🎯 ag-ui-crews
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License" /></a>
-  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript" />
-  <a href="https://docs.ag-ui.com"><img src="https://img.shields.io/badge/protocol-AG--UI-8B5CF6" alt="AG-UI Protocol" /></a>
-  <img src="https://img.shields.io/badge/tests-95%20passing-brightgreen" alt="Tests: 95 passing" />
-</p>
+### **The cockpit for your AI agent crews.**
 
-<p align="center">
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#architecture">Architecture</a> •
-  <a href="#features">Features</a> •
-  <a href="#api-reference">API</a> •
-  <a href="#ag-ui-events">Events</a> •
-  <a href="#testing">Testing</a>
-</p>
+Watch your multi-agent teams think, plan, and build — in real time, in your browser.
+
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](#tech-stack)
+[![AG-UI Protocol](https://img.shields.io/badge/protocol-AG--UI-8B5CF6)](https://docs.ag-ui.com)
+[![Tests](https://img.shields.io/badge/tests-106%20passing-brightgreen)](#testing)
+[![Bun](https://img.shields.io/badge/runtime-Bun-f9a8d4?logo=bun&logoColor=white)](https://bun.sh)
+
+[Quick Start](#-quick-start) · [Demo](#-see-it-in-action) · [Architecture](#-architecture) · [API](#-api-reference) · [Contributing](#-contributing)
+
+</div>
 
 ---
 
-## Quick Demo
-
-```bash
-bun run dev
-# → Open http://localhost:5173
-# → Click "Run Simulation"
-```
-
-The dashboard springs to life: a feasibility assessment appears, agents register one by one with pulse animations, tasks fan out across waves, artifacts stream in, and the event log scrolls in real time — all powered by AG-UI protocol events over SSE. No agents required.
+Your AI crew is doing real work — planning tasks, assigning roles, executing in parallel waves, producing artifacts. But right now? It's a wall of terminal logs. **ag-ui-crews** gives you eyes on the operation. A live dashboard that streams every decision, every agent heartbeat, every completed task as it happens. Built on the [AG-UI protocol](https://docs.ag-ui.com), it turns invisible agent orchestration into something you can see, understand, and trust.
 
 ---
 
-## Architecture
+## 🎬 See It in Action
+
+<div align="center">
+  <video src="https://github.com/aviraldua93/ag-ui-crews/raw/main/docs/demo.webm" width="100%" autoplay loop muted></video>
+</div>
+
+<br />
+
+<details>
+<summary><strong>📸 Screenshots (click to expand)</strong></summary>
+<br />
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/demo-1-landing.png" width="100%" alt="Landing" />
+      <br /><strong>Hero Landing</strong><br />
+      <sub>One click to launch a simulation or connect to a live crew</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/demo-2-planning.png" width="100%" alt="Planning" />
+      <br /><strong>Planning Phase</strong><br />
+      <sub>Feasibility assessment, role assignments, task breakdown by wave</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/demo-3-executing.png" width="100%" alt="Executing" />
+      <br /><strong>Execution</strong><br />
+      <sub>Agents working in parallel, wave progress, live event stream</sub>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/demo-4-completed.png" width="100%" alt="Completed" />
+      <br /><strong>Mission Complete</strong><br />
+      <sub>All tasks green, artifacts produced, full metrics summary</sub>
+    </td>
+  </tr>
+</table>
+
+</details>
+
+---
+
+## 🔺 The Agentic Stack
+
+We're in the middle of a protocol revolution. Three open standards are reshaping how AI agents work — with tools, with each other, and with us.
 
 ```mermaid
-flowchart LR
-    A2A["a2a-crews bridge\n(A2A REST)"] -->|HTTP poll| Server["ag-ui-crews server\n(Bun :4120)"]
-    Sim["Simulation engine"] -->|events| Server
-    Server -->|SSE stream\n(AG-UI events)| Client["React dashboard\n(:5173)"]
+graph TB
+    subgraph HUMANS["👤 Humans"]
+        direction LR
+        User["User / Developer"]
+    end
 
+    subgraph AGUI["🟣 AG-UI — Agent ↔ Human"]
+        direction LR
+        Dashboard["ag-ui-crews dashboard"]
+    end
+
+    subgraph A2A["🟢 A2A — Agent ↔ Agent"]
+        direction LR
+        Crews["a2a-crews orchestrator"]
+    end
+
+    subgraph MCP["🔵 MCP — Agent ↔ Tools"]
+        direction LR
+        Tools["Files · APIs · DBs · Services"]
+    end
+
+    User -->|"watches & controls"| Dashboard
+    Dashboard -->|"streams events from"| Crews
+    Crews -->|"coordinates"| Agents["Agent Team"]
+    Agents -->|"calls via"| Tools
+
+    style HUMANS fill:#1c1917,stroke:#a8a29e,color:#e7e5e3
+    style AGUI fill:#1e1b4b,stroke:#7c3aed,color:#e0e7ff
     style A2A fill:#064e3b,stroke:#10b981,color:#d1fae5
-    style Sim fill:#1c1917,stroke:#a8a29e,color:#e7e5e3
-    style Server fill:#0c4a6e,stroke:#0ea5e9,color:#e0f2fe
-    style Client fill:#1e1b4b,stroke:#7c3aed,color:#e0e7ff
+    style MCP fill:#0c4a6e,stroke:#0ea5e9,color:#e0f2fe
 ```
 
-**Two data sources, one protocol.** The server accepts events from either a live a2a-crews bridge (HTTP polling) or the built-in simulation engine, translates them to [AG-UI protocol](https://docs.ag-ui.com) events, and streams them to connected clients via SSE.
+| Protocol | Role | Think of it as… |
+|----------|------|-----------------|
+| **[MCP](https://modelcontextprotocol.io)** | Agent ↔ Tools | USB-C for AI — plug into any data source |
+| **[A2A](https://a2aproject.org)** | Agent ↔ Agent | The team Slack — agents coordinate and delegate |
+| **[AG-UI](https://docs.ag-ui.com)** | Agent ↔ Human | The glass cockpit — humans see and steer |
+
+**ag-ui-crews sits at the intersection of A2A and AG-UI.** [a2a-crews](https://github.com/aviraldua93/a2a-crews) orchestrates agent teams using A2A. ag-ui-crews makes that orchestration visible using AG-UI. Together, they close the loop:
+
+> **Humans → Agents → Tools → Agents → Humans**
 
 ---
 
-## Features
+## ⚡ Why ag-ui-crews?
 
-- **Real-time SSE streaming** via AG-UI protocol events (`RUN_STARTED`, `STEP_STARTED`, `STATE_SNAPSHOT`, `CUSTOM`, etc.)
-- **Simulation mode** — demo the full crew lifecycle without running agents
-- **Bridge connector** — connects to live [a2a-crews](https://github.com/aviraldua93/a2a-crews) runs
-- **Planning view** with feasibility assessment (go / risky / no-go)
-- **Agent status cards** with live pulse animations
-- **Wave timeline** with task dependency visualization
-- **Artifact viewer** for produced deliverables
-- **Scrolling event log** with type filters
-- **Metrics dashboard** — tasks, waves, agents, elapsed time, completion %
-- **95 passing tests** (Vitest) + Playwright E2E tests
+|  | ag-ui-crews | CopilotKit | LangGraph Studio | CrewAI Dashboard |
+|--|:-----------:|:----------:|:----------------:|:----------------:|
+| Protocol-native (AG-UI) | ✅ | ✅ (creator) | ❌ | ❌ |
+| Multi-agent wave visualization | ✅ | ❌ | ✅ | ❌ |
+| Feasibility assessment UI | ✅ | ❌ | ❌ | ❌ |
+| Real-time SSE streaming | ✅ | ✅ | ✅ | Polling |
+| Simulation mode (no agents needed) | ✅ | ❌ | ❌ | ❌ |
+| Zero config | ✅ | Config needed | Cloud only | Cloud only |
+| Open source | ✅ MIT | ✅ | ❌ | ❌ |
 
 ---
 
-## Quick Start
+## ✨ Features
+
+<table>
+<tr>
+<td>
+
+🔍 **Feasibility Assessment**<br/>
+<sub>AI-powered go / risky / no-go verdict before work begins</sub>
+
+</td>
+<td>
+
+🌊 **Wave Timeline**<br/>
+<sub>Parallel execution waves with task dependencies visualized</sub>
+
+</td>
+<td>
+
+🤖 **Agent Status Cards**<br/>
+<sub>Live pulse animations, role assignments, task progress</sub>
+
+</td>
+</tr>
+<tr>
+<td>
+
+📊 **Metrics Dashboard**<br/>
+<sub>Tasks, waves, agents, elapsed time, completion percentage</sub>
+
+</td>
+<td>
+
+📦 **Artifact Viewer**<br/>
+<sub>Browse deliverables produced by each agent</sub>
+
+</td>
+<td>
+
+📜 **Event Log**<br/>
+<sub>Scrolling, filterable log of every AG-UI protocol event</sub>
+
+</td>
+</tr>
+<tr>
+<td>
+
+🎭 **Simulation Mode**<br/>
+<sub>Full crew lifecycle demo — no agents or API keys needed</sub>
+
+</td>
+<td>
+
+🌉 **Live Bridge Connector**<br/>
+<sub>Connect to running a2a-crews for real agent monitoring</sub>
+
+</td>
+<td>
+
+🧪 **106 Tests**<br/>
+<sub>95 Vitest unit + 11 Playwright E2E — CI-ready</sub>
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🚀 Quick Start
 
 ```bash
 git clone https://github.com/aviraldua93/ag-ui-crews.git
 cd ag-ui-crews && bun install
-bun run dev
-# Open http://localhost:5173 → Click "Run Simulation"
+bun run dev   # → http://localhost:5173
 ```
+
+Click **"Run Simulation"** and watch a full crew execution unfold — feasibility check, agent registration, wave-by-wave task execution, artifact production, and completion. No agents required.
 
 > **Prerequisite:** [Bun](https://bun.sh) ≥ 1.0
 
 ---
 
-## Connect to a Live Crew
+## 🌉 Connect to a Live Crew
+
+Two terminals. That's it.
 
 ```bash
-# Terminal 1 — run a2a-crews
-cd your-project && crews plan "Build something" && crews apply && crews launch
-
-# Terminal 2 — start dashboard
-cd ag-ui-crews && bun run dev
-# Click "Connect to Bridge" → enter bridge URL from crews output
+# Terminal 1 — launch your agent crew
+cd your-project
+crews plan "Build a REST API with auth and tests"
+crews apply
+crews launch
 ```
 
-The dashboard connects to the a2a-crews bridge, polls for state changes, and streams live execution events to your browser.
+```bash
+# Terminal 2 — open the dashboard
+cd ag-ui-crews && bun run dev
+# Click "Connect to Bridge" → paste the bridge URL from crews output
+```
+
+The dashboard connects to the [a2a-crews](https://github.com/aviraldua93/a2a-crews) bridge, polls for state changes, and streams every event to your browser in real time.
 
 ---
 
-## API Reference
+## 🏗 Architecture
+
+```mermaid
+flowchart LR
+    Bridge["a2a-crews bridge\n(A2A Protocol)"] -->|"HTTP poll"| Server["Bun Server\n(:4120)"]
+    Sim["Simulator\n(demo mode)"] -->|"events"| Server
+    Server -->|"SSE stream\n(AG-UI events)"| Client["React Dashboard\n(:5173)"]
+    User["👤 You"] -->|"browser"| Client
+
+    style Bridge fill:#064e3b,stroke:#10b981,color:#d1fae5
+    style Sim fill:#1c1917,stroke:#a8a29e,color:#e7e5e3
+    style Server fill:#0c4a6e,stroke:#0ea5e9,color:#e0f2fe
+    style Client fill:#1e1b4b,stroke:#7c3aed,color:#e0e7ff
+    style User fill:#422006,stroke:#f59e0b,color:#fef3c7
+```
+
+**Two data sources, one protocol.** The Bun server accepts events from either a live a2a-crews bridge or the built-in simulator, translates everything into [AG-UI protocol](https://docs.ag-ui.com) events, and streams them to connected clients over SSE. The React dashboard consumes the stream and renders the crew's state in real time.
+
+---
+
+## 📡 AG-UI Protocol Events
+
+Every event flowing through the dashboard follows the [AG-UI protocol](https://docs.ag-ui.com) specification:
+
+| Event Type | What It Shows in the UI |
+|------------|-------------------------|
+| `RUN_STARTED` / `RUN_FINISHED` | Session begins → completion banner |
+| `STEP_STARTED` / `STEP_FINISHED` | Phase transitions (planning → wave-0 → wave-1 → …) |
+| `TEXT_MESSAGE_START` / `CONTENT` / `END` | Streaming plan summaries, task updates |
+| `STATE_SNAPSHOT` | Full dashboard hydration on connect |
+| `STATE_DELTA` | Incremental state patches (agent status, task progress) |
+| `TOOL_CALL_START` / `ARGS` / `END` | Tool invocations rendered in event log |
+| `CUSTOM` | Domain events — `CREW_PLAN_*`, `WAVE_*`, `AGENT_*`, `TASK_*`, `ARTIFACT_PRODUCED`, `BRIDGE_*`, `METRICS_UPDATE` |
+
+---
+
+## 📖 API Reference
 
 The server runs on port **4120** (configurable via `PORT` env var).
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `GET` | `/events` | SSE stream — AG-UI protocol events. Sends `STATE_SNAPSHOT` on connect. |
-| `POST` | `/api/simulate` | Start a simulation session. Accepts optional `scenario`, `speedMultiplier`, `failureRate`. |
+| `GET` | `/events` | SSE stream of AG-UI protocol events. Sends `STATE_SNAPSHOT` on connect. |
+| `POST` | `/api/simulate` | Start a simulation. Body: `{ scenario?, speedMultiplier?, failureRate? }` |
 | `POST` | `/api/connect` | Connect to a live a2a-crews bridge. Body: `{ "bridgeUrl": "http://..." }` |
 | `POST` | `/api/stop` | Stop the current session (bridge or simulation). Resets state. |
-| `GET` | `/api/state` | Current dashboard state snapshot as JSON. |
+| `GET` | `/api/state` | Current dashboard state as a JSON snapshot. |
 | `GET` | `/api/health` | Health check — uptime, client count, bridge/simulation status. |
 
 ---
 
-## AG-UI Events
+## 🛠 Tech Stack
 
-Events sent over the SSE stream, following the [AG-UI protocol](https://docs.ag-ui.com):
-
-| Event Type | Purpose |
-|------------|---------|
-| `RUN_STARTED` / `RUN_FINISHED` | Session lifecycle |
-| `STEP_STARTED` / `STEP_FINISHED` | Logical phases (`"planning"`, `"wave-0"`, …) |
-| `TEXT_MESSAGE_START` / `CONTENT` / `END` | Streaming text messages (plan summaries, task updates) |
-| `STATE_SNAPSHOT` | Full dashboard state on connect / reset |
-| `STATE_DELTA` | Incremental state patches |
-| `TOOL_CALL_START` / `ARGS` / `END` | Tool invocations |
-| `CUSTOM` | Domain events — wraps `CREW_PLAN_*`, `WAVE_*`, `AGENT_*`, `TASK_*`, `ARTIFACT_PRODUCED`, `BRIDGE_*`, `METRICS_UPDATE` |
-
----
-
-## Tech Stack
-
-| | |
-|---|---|
-| **Runtime** | [Bun](https://bun.sh) |
-| **Frontend** | [React 19](https://react.dev) · TypeScript · [Vite 6](https://vite.dev) |
+| Layer | Technology |
+|-------|-----------|
+| **Runtime** | [Bun](https://bun.sh) — fast JS runtime, bundler, and test runner |
+| **Frontend** | [React 19](https://react.dev) · [TypeScript](https://www.typescriptlang.org/) (strict) · [Vite 6](https://vite.dev) |
 | **Styling** | [Tailwind CSS 4](https://tailwindcss.com) · [Framer Motion](https://www.framer.com/motion/) |
-| **Protocol** | [AG-UI](https://docs.ag-ui.com) (`@ag-ui/core`) |
-| **Testing** | [Vitest](https://vitest.dev) · [Playwright](https://playwright.dev) |
+| **Protocol** | [AG-UI](https://docs.ag-ui.com) via [`@ag-ui/core`](https://www.npmjs.com/package/@ag-ui/core) |
+| **Testing** | [Vitest](https://vitest.dev) (unit) · [Playwright](https://playwright.dev) (E2E) |
 
 ---
 
-## Testing
+## 🧪 Testing
 
 ```bash
-bun run test           # 95 unit tests (Vitest)
-bun run test:e2e       # Playwright E2E — full simulation lifecycle
+bun run test        # 95 unit tests (Vitest)
+bun run test:e2e    # 11 E2E tests (Playwright)
 ```
 
-Unit tests cover the event emitter, simulator, SSE integration, AG-UI translation, and the client-side reducer. E2E tests verify the complete flow from hero landing through planning, execution, artifacts, and completion.
+Unit tests cover the event emitter, simulator, SSE integration, AG-UI event translation, and the client-side state reducer. E2E tests drive a real browser through the complete lifecycle — hero landing → planning → wave execution → artifacts → completion.
 
 ---
 
-## Dogfood Story 🐕
+## 🐕 The Dogfood Story
 
-This project was built using [a2a-crews](https://github.com/aviraldua93/a2a-crews) itself — dogfood squared. A crew of AI agents planned the architecture, wrote the server, built the React components, authored tests, and integrated SSE streaming. Bugs found during the build were [filed back as issues](https://github.com/aviraldua93/a2a-crews/issues) on a2a-crews.
+This project was built using [a2a-crews](https://github.com/aviraldua93/a2a-crews) itself.
 
----
+We ran `crews plan` against the scaffolded project. The AI planner designed a 4-role team — **server-test-author**, **sse-integration-dev**, **e2e-test-author**, **docs-author** — and `crews launch` spawned real agents that wrote the test configs, unit tests, and Playwright E2E suites.
 
-## Relationship to a2a-crews
-
-**ag-ui-crews** is the companion dashboard for [a2a-crews](https://github.com/aviraldua93/a2a-crews), a CLI that orchestrates multi-agent crews using the A2A protocol. While a2a-crews handles agent coordination in the terminal, ag-ui-crews gives you a real-time visual interface for the same execution — built on the [AG-UI protocol](https://docs.ag-ui.com).
+Along the way, we discovered and filed 3 bugs ([#10](https://github.com/aviraldua93/a2a-crews/issues/10), [#11](https://github.com/aviraldua93/a2a-crews/issues/11), [#12](https://github.com/aviraldua93/a2a-crews/issues/12)) back on a2a-crews — making both projects better. Dogfood squared.
 
 ---
 
-## Roadmap
+## 🗺 Roadmap
 
-- [ ] Live bridge auto-discovery
-- [ ] Token cost tracking
-- [ ] Multi-crew dashboard
-- [ ] Dark/light theme toggle
+- [ ] Live bridge auto-discovery (scan localhost ports)
+- [ ] Token cost tracking per agent
+- [ ] Multi-crew dashboard (watch multiple teams simultaneously)
+- [ ] Dark / light theme toggle
+- [ ] Mobile-responsive layout
+- [ ] Agent log streaming (see what each agent is thinking)
+- [ ] A2A ↔ AG-UI protocol bridge (bidirectional)
+- [ ] CopilotKit integration for human-in-the-loop control
 
 ---
 
-## License
+## 🤝 Contributing
+
+Contributions are welcome! Check out the [open issues](https://github.com/aviraldua93/ag-ui-crews/issues) for ideas, or open a new one if you have a feature request or bug report.
+
+```bash
+bun install           # Install dependencies
+bun run dev           # Start dev server
+bun run test          # Run unit tests
+bun run test:e2e      # Run E2E tests
+bun run typecheck     # Type check
+```
+
+---
+
+## 📄 License
 
 [MIT](LICENSE) © 2026 [Aviral Dua](https://github.com/aviraldua93)
 
 ---
 
 <p align="center">
-  Built on <a href="https://docs.ag-ui.com">AG-UI Protocol</a> · <a href="https://github.com/aviraldua93/a2a-crews">a2a-crews</a> · <a href="https://bun.sh">Bun</a> · <a href="https://react.dev">React</a>
+  <strong>Built on</strong>
+  <a href="https://docs.ag-ui.com">AG-UI Protocol</a> ·
+  <a href="https://github.com/aviraldua93/a2a-crews">a2a-crews</a> ·
+  <a href="https://bun.sh">Bun</a> ·
+  <a href="https://react.dev">React</a> ·
+  <a href="https://a2aproject.org">A2A Protocol</a>
 </p>
