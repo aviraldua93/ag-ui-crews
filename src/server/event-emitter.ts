@@ -70,6 +70,20 @@ export class EventEmitter {
   private state: DashboardState = structuredClone(INITIAL_DASHBOARD_STATE);
   /** Shared TextEncoder instance for converting SSE string frames to `Uint8Array`. */
   private encoder = new TextEncoder();
+  /** Heartbeat interval that keeps SSE connections alive and flushes proxy buffers. */
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+  constructor() {
+    // Send SSE comment heartbeats every 15s to keep connections alive
+    // and force proxy buffers (e.g. Vite dev proxy) to flush.
+    this.heartbeatInterval = setInterval(() => {
+      if (this.clients.size === 0) return;
+      const heartbeat = this.encoder.encode(": heartbeat\n\n");
+      for (const controller of this.clients) {
+        try { controller.enqueue(heartbeat); } catch { this.clients.delete(controller); }
+      }
+    }, 15_000);
+  }
 
   /**
    * Registers a new SSE client and immediately sends the current
@@ -439,6 +453,14 @@ export class EventEmitter {
           this.state.metrics.completedTasks = updates.completedTasks as number;
         if (updates.failedTasks !== undefined)
           this.state.metrics.failedTasks = updates.failedTasks as number;
+        if (updates.agentCount !== undefined)
+          this.state.metrics.agentCount = updates.agentCount as number;
+        if (updates.taskCount !== undefined)
+          this.state.metrics.taskCount = updates.taskCount as number;
+        if (updates.waveCount !== undefined)
+          this.state.metrics.waveCount = updates.waveCount as number;
+        if (updates.retryCount !== undefined)
+          this.state.metrics.retryCount = updates.retryCount as number;
         break;
       }
 

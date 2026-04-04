@@ -116,7 +116,7 @@ export async function discoverBridges(): Promise<DiscoveredBridge[]> {
  * Filesystem errors (e.g., no `.a2a-crews` directory, permission denied) are
  * silently caught so discovery is best-effort and never throws.
  *
- * @returns An array of `{ port, team }` candidates, deduplicated by port number.
+ * @returns An array of `{ port, team, scenario }` candidates, deduplicated by port number.
  */
 async function findBridgeJsonFiles(): Promise<Array<{ port: number; team: string; scenario: string }>> {
   const found: Array<{ port: number; team: string; scenario: string }> = [];

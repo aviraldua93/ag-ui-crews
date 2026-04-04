@@ -208,8 +208,10 @@ async function handleConnect(req: Request): Promise<Response> {
       return errorResponse("bridgeUrl is required");
     }
 
-    // Stop any existing session first
+    // Stop any existing session and drain in-flight events
     stopSession();
+    emitter.reset();
+    await new Promise((r) => setTimeout(r, 100));
     emitter.reset();
 
     const { threadId, runId } = startRun();

@@ -64,6 +64,22 @@ function updateWaveTask(waves: WaveState[], taskId: string, updater: (t: TaskSta
   }));
 }
 
+/** Resolves a task status change across both flat tasks and wave-nested tasks. */
+function resolveTask(
+  state: DashboardState,
+  data: Record<string, unknown>,
+  status: TaskState["status"],
+  extra: Partial<TaskState> = {}
+): Pick<DashboardState, "tasks" | "waves" | "metrics"> {
+  const taskId = data.taskId as string;
+  const updater = (t: TaskState): TaskState => ({ ...t, status, ...extra });
+  return {
+    tasks: updateTask(state.tasks, taskId, updater),
+    waves: updateWaveTask(state.waves, taskId, updater),
+    metrics: state.metrics,
+  };
+}
+
 function reducer(state: DashboardState, action: Action): DashboardState {
   switch (action.type) {
     case "RESET":
@@ -189,95 +205,48 @@ function reducer(state: DashboardState, action: Action): DashboardState {
             })),
           };
 
-        case "TASK_SUBMITTED":
-          return {
-            ...state,
-            eventLog,
-            tasks: updateTask(state.tasks, data.taskId as string, (t) => ({
-              ...t,
-              status: "submitted",
-            })),
-            waves: updateWaveTask(state.waves, data.taskId as string, (t) => ({
-              ...t,
-              status: "submitted",
-            })),
-          };
+        case "TASK_SUBMITTED": {
+          const r = resolveTask(state, data, "submitted");
+          return { ...state, eventLog, ...r };
+        }
 
-        case "TASK_WORKING":
-          return {
-            ...state,
-            eventLog,
-            tasks: updateTask(state.tasks, data.taskId as string, (t) => ({
-              ...t,
-              status: "working",
-              startedAt: Date.now(),
-            })),
-            waves: updateWaveTask(state.waves, data.taskId as string, (t) => ({
-              ...t,
-              status: "working",
-              startedAt: Date.now(),
-            })),
-          };
+        case "TASK_WORKING": {
+          const r = resolveTask(state, data, "working", { startedAt: Date.now() });
+          return { ...state, eventLog, ...r };
+        }
 
-        case "TASK_COMPLETED":
+        case "TASK_COMPLETED": {
+          const r = resolveTask(state, data, "completed", { completedAt: Date.now() });
           return {
             ...state,
             eventLog,
-            tasks: updateTask(state.tasks, data.taskId as string, (t) => ({
-              ...t,
-              status: "completed",
-              completedAt: Date.now(),
-            })),
-            waves: updateWaveTask(state.waves, data.taskId as string, (t) => ({
-              ...t,
-              status: "completed",
-              completedAt: Date.now(),
-            })),
-            metrics: {
-              ...state.metrics,
-              completedTasks: state.metrics.completedTasks + 1,
-            },
+            ...r,
+            metrics: { ...r.metrics, completedTasks: state.metrics.completedTasks + 1 },
           };
+        }
 
-        case "TASK_FAILED":
+        case "TASK_FAILED": {
+          const r = resolveTask(state, data, "failed", { completedAt: Date.now() });
           return {
             ...state,
             eventLog,
-            tasks: updateTask(state.tasks, data.taskId as string, (t) => ({
-              ...t,
-              status: "failed",
-              completedAt: Date.now(),
-            })),
-            waves: updateWaveTask(state.waves, data.taskId as string, (t) => ({
-              ...t,
-              status: "failed",
-              completedAt: Date.now(),
-            })),
-            metrics: {
-              ...state.metrics,
-              failedTasks: state.metrics.failedTasks + 1,
-            },
+            ...r,
+            metrics: { ...r.metrics, failedTasks: state.metrics.failedTasks + 1 },
           };
+        }
 
-        case "TASK_RETRYING":
+        case "TASK_RETRYING": {
+          const taskId = data.taskId as string;
+          const existing = state.tasks.find((t) => t.id === taskId);
+          const rc = (existing?.retryCount ?? 0) + 1;
+          const r = resolveTask(state, data, "working", { retryCount: rc });
           return {
             ...state,
             eventLog,
-            tasks: updateTask(state.tasks, data.taskId as string, (t) => ({
-              ...t,
-              status: "working",
-              retryCount: t.retryCount + 1,
-            })),
-            waves: updateWaveTask(state.waves, data.taskId as string, (t) => ({
-              ...t,
-              status: "working",
-              retryCount: t.retryCount + 1,
-            })),
-            metrics: {
-              ...state.metrics,
-              retryCount: state.metrics.retryCount + 1,
-            },
+            ...r,
+            metrics: { ...r.metrics, retryCount: state.metrics.retryCount + 1 },
           };
+        }
 
         case "WAVE_STARTED": {
           const waveIndex = data.waveIndex as number;
@@ -464,6 +433,16 @@ export async function connectToBridge(url: string): Promise<void> {
     body: JSON.stringify({ bridgeUrl: url }),
   });
   if (!res.ok) throw new Error(`Failed to connect: ${res.statusText}`);
+}
+
+export async function fetchState(): Promise<DashboardState | null> {
+  try {
+    const res = await fetch("/api/state");
+    if (!res.ok) return null;
+    return (await res.json()) as DashboardState;
+  } catch {
+    return null;
+  }
 }
 
 export async function startSimulation(config?: Partial<SimulationConfig>): Promise<void> {

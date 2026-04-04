@@ -383,9 +383,9 @@ export type DashboardPhase =
   | "error";
 
 /**
- * Client-side state for a single agent during execution.
+ * Represents the runtime state of a single agent during execution.
  *
- * Created when an `AGENT_REGISTERED` {@link DashboardEvent} fires, then
+ * Initialized when an `AGENT_REGISTERED` {@link DashboardEvent} fires, then
  * updated by `AGENT_ACTIVE`, `AGENT_COMPLETED`, `AGENT_FAILED`, and
  * `AGENT_RETRYING` events.  The `useCrewState` hook groups agents by
  * status for the dashboard's agent panel.

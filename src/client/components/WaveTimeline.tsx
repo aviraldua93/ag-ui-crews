@@ -1,5 +1,4 @@
-import { motion } from "framer-motion";
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
 import type { WaveState, TaskStatus } from "@shared/types";
 
 interface WaveTimelineProps {
@@ -15,117 +14,59 @@ const taskDot: Record<TaskStatus, string> = {
   canceled: "bg-gray-700",
 };
 
-const taskText: Record<TaskStatus, string> = {
-  pending: "text-gray-500",
-  submitted: "text-gray-400",
-  working: "text-violet-400",
-  completed: "text-emerald-400",
-  failed: "text-rose-400",
-  canceled: "text-gray-600",
-};
-
 export function WaveTimeline({ waves }: WaveTimelineProps) {
+  const [collapsedWaves, setCollapsedWaves] = useState<Set<number>>(new Set());
+
   if (waves.length === 0) {
     return (
-      <div className="rounded-xl bg-gray-900 border border-gray-800 p-4">
-        <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-          Waves
-        </h2>
-        <div className="text-center py-6 text-gray-600 text-xs">
-          No waves scheduled yet
-        </div>
+      <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
+        <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Timeline</h2>
+        <div className="text-center py-6 text-gray-600 text-xs">No waves scheduled yet</div>
       </div>
     );
   }
 
+  const toggleWave = (idx: number) => {
+    setCollapsedWaves((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx); else next.add(idx);
+      return next;
+    });
+  };
+
   return (
-    <div className="rounded-xl bg-gray-900 border border-gray-800 p-4">
-      <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
-        Waves
-      </h2>
-
-      {/* Progress dots */}
-      {waves.length > 1 && (
-        <div className="flex items-center gap-1 mb-4 px-1">
-          {waves.map((wave, i) => (
-            <div key={wave.index} className="flex items-center">
-              <div className={`w-2 h-2 rounded-full ${
-                wave.status === "completed" ? "bg-emerald-500" :
-                wave.status === "active" ? "bg-violet-500 animate-pulse" :
-                wave.status === "failed" ? "bg-rose-500" :
-                "bg-gray-700"
-              }`} />
-              {i < waves.length - 1 && (
-                <div className={`h-px w-6 ${
-                  wave.status === "completed" ? "bg-emerald-500/40" : "bg-gray-800"
-                }`} />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {waves.map((wave, i) => {
+    <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
+      <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-3">Timeline</h2>
+      <div className="space-y-2">
+        {waves.map((wave) => {
           const completed = wave.tasks.filter((t) => t.status === "completed").length;
           const total = wave.tasks.length;
-          const pct = total > 0 ? (completed / total) * 100 : 0;
-
+          const isActive = wave.status === "active";
+          const isDone = wave.status === "completed";
+          const isFailed = wave.status === "failed";
+          const isCollapsed = collapsedWaves.has(wave.index);
           return (
-            <motion.div
-              key={wave.index}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.06, duration: 0.25 }}
-              className={`rounded-lg border p-3 ${
-                wave.status === "active"
-                  ? "border-violet-500/30 bg-violet-500/5"
-                  : "border-gray-800 bg-gray-800/30"
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
+            <div key={wave.index} className={`rounded-lg border transition-colors ${isActive ? "border-violet-500/30 bg-violet-500/5" : isDone ? "border-gray-800 bg-gray-800/20" : isFailed ? "border-rose-500/20 bg-rose-500/5" : "border-gray-800 bg-gray-800/30"}`}>
+              <button onClick={() => toggleWave(wave.index)} className="w-full flex items-center justify-between px-3 py-2 text-left">
                 <div className="flex items-center gap-2">
-                  {wave.status === "active" && <Loader2 className="w-3 h-3 text-violet-400 animate-spin" />}
-                  {wave.status === "completed" && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
-                  {wave.status === "failed" && <XCircle className="w-3 h-3 text-rose-500" />}
-                  <span className="text-xs font-semibold text-gray-300">
-                    Wave {wave.index + 1}
-                  </span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isActive ? "bg-violet-500 animate-pulse" : isDone ? "bg-emerald-500" : isFailed ? "bg-rose-500" : "bg-gray-600"}`} />
+                  <span className="text-xs font-semibold text-gray-300">Wave {wave.index + 1}</span>
+                  <span className="text-[10px] text-gray-600 font-mono">{completed}/{total} {isDone ? "\u2713" : isFailed ? "\u2717" : ""}</span>
                 </div>
-                <span className="text-[10px] text-gray-600 font-mono">
-                  {completed}/{total}
-                </span>
-              </div>
-
-              {/* Progress bar */}
-              <div className="h-0.5 bg-gray-800 rounded-full overflow-hidden mb-2">
-                <motion.div
-                  className={`h-full rounded-full ${
-                    wave.status === "failed" ? "bg-rose-500" :
-                    wave.status === "completed" ? "bg-emerald-500" :
-                    "bg-violet-500"
-                  }`}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pct}%` }}
-                  transition={{ duration: 0.4 }}
-                />
-              </div>
-
-              {/* Tasks */}
-              <div className="space-y-1">
-                {wave.tasks.map((task) => (
-                  <div key={task.id} className="flex items-center gap-2 text-xs">
-                    <span className={`w-1 h-1 rounded-full flex-shrink-0 ${taskDot[task.status]}`} />
-                    <span className={`truncate ${taskText[task.status]}`}>
-                      {task.title}
-                    </span>
-                    <span className="text-gray-700 text-[10px] ml-auto flex-shrink-0">
-                      {task.assignedTo}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+                <span className="text-[10px] text-gray-700">{isCollapsed ? "\u25BC" : "\u25B2"}</span>
+              </button>
+              {!isCollapsed && (
+                <div className="px-3 pb-2 space-y-0.5">
+                  {wave.tasks.map((task) => (
+                    <div key={task.id} className="flex items-center gap-2 text-xs py-0.5">
+                      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${taskDot[task.status]}`} />
+                      <span className={`truncate ${task.status === "completed" ? "text-gray-500" : task.status === "working" ? "text-violet-300" : task.status === "failed" ? "text-rose-400" : "text-gray-400"}`}>{task.title}</span>
+                      <span className="text-gray-700 text-[10px] ml-auto flex-shrink-0 font-mono">{task.assignedTo}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

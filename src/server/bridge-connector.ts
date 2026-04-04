@@ -190,6 +190,7 @@ export class BridgeConnector {
       const { readdir, readFile } = await import("fs/promises");
       const { join, dirname } = await import("path");
       const port = new URL(this.bridgeUrl).port;
+      console.log(`[bridge] initializePlan: looking for bridge.json with port ${port}`);
       const cwd = process.cwd();
       const parent = dirname(cwd);
       const searchRoots = [cwd, parent];
@@ -210,6 +211,7 @@ export class BridgeConnector {
               const bridgeContent = await readFile(join(a2aDir, entry.name, "bridge.json"), "utf-8");
               const bridgeData = JSON.parse(bridgeContent);
               if (String(bridgeData.port) !== port) continue;
+              console.log(`[bridge] initializePlan: MATCHED ${entry.name} with port ${bridgeData.port}`);
 
               const crewContent = await readFile(join(a2aDir, entry.name, "crew.json"), "utf-8");
               const crew = JSON.parse(crewContent);

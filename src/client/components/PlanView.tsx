@@ -1,10 +1,4 @@
-import { motion } from "framer-motion";
-import {
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  ArrowRight,
-} from "lucide-react";
+import { useState } from "react";
 import type { CrewPlan, FeasibilityVerdict } from "@shared/types";
 
 interface PlanViewProps {
@@ -12,144 +6,80 @@ interface PlanViewProps {
   phase: string;
 }
 
-const verdictConfig: Record<
-  FeasibilityVerdict,
-  { label: string; icon: typeof CheckCircle2; color: string }
-> = {
-  go: { label: "GO", icon: CheckCircle2, color: "text-emerald-400" },
-  risky: { label: "RISKY", icon: AlertTriangle, color: "text-amber-400" },
-  "no-go": { label: "NO-GO", icon: XCircle, color: "text-rose-400" },
+const verdictColor: Record<FeasibilityVerdict, string> = {
+  go: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
+  risky: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  "no-go": "text-rose-400 bg-rose-500/10 border-rose-500/20",
 };
 
-function ProgressBar({ value, label, color }: { value: number; label: string; color: string }) {
-  return (
-    <div>
-      <div className="flex justify-between text-[10px] mb-1">
-        <span className="text-gray-600 uppercase tracking-wider">{label}</span>
-        <span className="text-gray-500 font-mono">{Math.round(value * 100)}%</span>
-      </div>
-      <div className="h-0.5 bg-gray-800 rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${value * 100}%` }}
-          transition={{ duration: 0.6, ease: "easeOut" }}
-          className={`h-full rounded-full ${color}`}
-        />
-      </div>
-    </div>
-  );
-}
-
-function Skeleton() {
-  return (
-    <div className="rounded-xl bg-gray-900 border border-gray-800 p-4 space-y-3">
-      <div className="flex items-center gap-3">
-        <div className="w-14 h-5 bg-gray-800 rounded animate-pulse" />
-        <div className="w-40 h-4 bg-gray-800 rounded animate-pulse" />
-      </div>
-      <div className="w-full h-3 bg-gray-800 rounded animate-pulse" />
-      <div className="flex gap-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="flex-1 h-16 bg-gray-800 rounded-lg animate-pulse" />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function PlanView({ plan, phase }: PlanViewProps) {
+  const [expanded, setExpanded] = useState(false);
+
   if (!plan) {
-    if (phase === "planning") return <Skeleton />;
+    if (phase === "planning") {
+      return (
+        <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-14 h-5 bg-gray-800 rounded animate-pulse" />
+            <div className="w-40 h-4 bg-gray-800 rounded animate-pulse" />
+          </div>
+        </div>
+      );
+    }
     return null;
   }
 
-  const v = verdictConfig[plan.feasibility.verdict];
-  const VerdictIcon = v.icon;
+  const v = plan.feasibility;
+  const pct = Math.round(v.confidence * 100);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className="rounded-xl bg-gray-900 border border-gray-800 p-4"
-    >
-      {/* Verdict + scenario */}
-      <div className="flex items-center gap-2.5 mb-3">
-        <span className={`flex items-center gap-1 text-xs font-semibold ${v.color}`}>
-          <VerdictIcon className="w-3.5 h-3.5" />
-          {v.label}
+    <div className="rounded-lg bg-gray-900 border border-gray-800">
+      <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/30 transition-colors">
+        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${verdictColor[v.verdict]}`}>
+          {v.verdict.toUpperCase()} {pct}%
         </span>
-        <span className="text-[10px] text-gray-600 font-mono">
-          {Math.round(plan.feasibility.confidence * 100)}%
-        </span>
-      </div>
-
-      <h2 className="text-sm font-semibold text-gray-200 mb-3">
-        {plan.scenario}
-      </h2>
-
-      {/* Roles */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        {plan.roles.map((role, i) => (
-          <motion.div
-            key={role.key}
-            initial={{ opacity: 0, x: -6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.06 }}
-            className="flex-shrink-0 min-w-[120px] bg-gray-800/60 rounded-lg p-2.5 border border-gray-800"
-          >
-            <div className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider mb-0.5">
-              {role.key}
-            </div>
-            <div className="text-[10px] text-gray-500 line-clamp-2">
-              {role.description}
-            </div>
-            {role.model && (
-              <div className="text-[9px] text-gray-700 mt-0.5 font-mono">{role.model}</div>
-            )}
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Task flow */}
-      <div className="mb-4">
-        <h3 className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-2">
-          Task Flow
-        </h3>
-        <div className="flex items-center gap-0.5 overflow-x-auto pb-1">
-          {plan.tasks.map((task, i) => (
-            <div key={task.id} className="flex items-center flex-shrink-0">
-              <div className="bg-gray-800/80 border border-gray-800 rounded-md px-2.5 py-1.5 text-xs">
-                <span className="text-gray-300">{task.title}</span>
-                <div className="text-[9px] text-gray-600 mt-0.5">→ {task.assignedTo}</div>
+        <span className="text-sm text-gray-200 truncate flex-1">{plan.scenario}</span>
+        <span className="text-[10px] text-gray-600">{expanded ? "\u25B2" : "\u25BC"}</span>
+      </button>
+      {expanded && (
+        <div className="px-4 pb-4 border-t border-gray-800">
+          {plan.roles.length > 0 && (
+            <div className="mt-3">
+              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Roles</h3>
+              <div className="space-y-1">
+                {plan.roles.map((role) => (
+                  <div key={role.key} className="flex items-center gap-2 text-xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
+                    <span className="font-mono text-violet-400">{role.key}</span>
+                    <span className="text-gray-600 truncate">{role.description}</span>
+                  </div>
+                ))}
               </div>
-              {i < plan.tasks.length - 1 && (
-                <ArrowRight className="w-2.5 h-2.5 text-gray-700 mx-0.5 flex-shrink-0" />
-              )}
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Feasibility bars */}
-      <div className="grid grid-cols-3 gap-3">
-        <ProgressBar value={plan.feasibility.technical} label="Technical" color="bg-violet-500" />
-        <ProgressBar value={plan.feasibility.scope} label="Scope" color="bg-violet-500" />
-        <ProgressBar value={plan.feasibility.risk} label="Risk" color="bg-amber-500" />
-      </div>
-
-      {plan.feasibility.concerns.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {plan.feasibility.concerns.map((c, i) => (
-            <span
-              key={i}
-              className="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/20"
-            >
-              {c}
-            </span>
-          ))}
+          )}
+          {plan.tasks.length > 0 && (
+            <div className="mt-3">
+              <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Tasks</h3>
+              <div className="space-y-1">
+                {plan.tasks.map((task) => (
+                  <div key={task.id} className="flex items-center gap-2 text-xs">
+                    <span className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0" />
+                    <span className="text-gray-300 truncate">{task.title}</span>
+                    <span className="text-gray-700 text-[10px] ml-auto flex-shrink-0 font-mono">{task.assignedTo}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {v.concerns.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {v.concerns.map((c, i) => (
+                <span key={i} className="px-2 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-500 border border-amber-500/20">{c}</span>
+              ))}
+            </div>
+          )}
         </div>
       )}
-    </motion.div>
+    </div>
   );
 }

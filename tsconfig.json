@@ -15,6 +15,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node", "react", "react-dom", "uuid", "chai", "deep-eql"],
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["src/shared/*"],
