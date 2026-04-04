@@ -99,6 +99,12 @@ export class BridgeConnector {
     tasks: new Map(),
     status: null,
   };
+  /**
+   * Tracks the last-emitted dashboard status for each agent by name.
+   * Used to avoid emitting duplicate AGENT_ACTIVE / AGENT_COMPLETED events
+   * when the derived status hasn't changed between polls.
+   */
+  private agentDashboardStatus: Map<string, "idle" | "active" | "completed"> = new Map();
 
   /**
    * Creates a new bridge connector.
@@ -335,13 +341,19 @@ export class BridgeConnector {
         this.fetchTasks(),
       ]);
 
-      if (!status) return;
+      if (!status) {
+        console.log("[bridge] poll: fetchStatus returned null, skipping");
+        return;
+      }
 
       // Diff agents
       this.diffAgents(agents);
 
       // Diff tasks
       this.diffTasks(tasks);
+
+      // Cross-reference tasks with agents to derive busy/idle/completed status
+      this.syncAgentStatuses(agents, tasks);
 
       // Emit aggregate metrics from bridge status (source of truth)
       const prev = this.prevState.status;
@@ -357,7 +369,7 @@ export class BridgeConnector {
             taskCount: status.tasks.total,
             completedTasks: status.tasks.completed,
             failedTasks: status.tasks.failed,
-            agentCount: status.agents.total,
+            agentCount: typeof status.agents === "number" ? status.agents : status.agents.total,
           },
         });
       }
@@ -522,6 +534,88 @@ export class BridgeConnector {
         });
       }
       this.prevState.agents.set(agent.name, agent);
+    }
+  }
+
+  /**
+   * Cross-references the current task list with registered agents to derive
+   * each agent's dashboard status (active / completed / idle) and emits
+   * AGENT_ACTIVE or AGENT_COMPLETED events when the derived status changes.
+   *
+   * The a2a-crews bridge reports agents as "online" but doesn't distinguish
+   * between busy and idle. This method fills that gap by examining task
+   * assignments:
+   *
+   * - **active** — at least one task assigned to this agent is `"working"` or `"submitted"`.
+   * - **completed** — every task assigned to this agent is in a terminal state
+   *   (`"completed"`, `"failed"`, `"canceled"`), and at least one task exists.
+   * - **idle** — no tasks assigned, or all tasks still `"pending"`.
+   *
+   * Only emits an event when the derived status differs from the last-emitted
+   * status (tracked in {@link agentDashboardStatus}).
+   */
+  private syncAgentStatuses(agents: BridgeAgent[], tasks: BridgeTask[]): void {
+    const now = Date.now();
+
+    // Build per-agent task summary
+    const agentTasks = new Map<string, { active: number; terminal: number; total: number; currentTaskTitle?: string }>();
+    for (const agent of agents) {
+      agentTasks.set(agent.name, { active: 0, terminal: 0, total: 0 });
+    }
+
+    for (const task of tasks) {
+      let entry = agentTasks.get(task.assignedTo);
+      if (!entry) {
+        entry = { active: 0, terminal: 0, total: 0 };
+        agentTasks.set(task.assignedTo, entry);
+      }
+      entry.total += 1;
+      if (task.status === "working" || task.status === "submitted") {
+        entry.active += 1;
+        if (task.status === "working") {
+          entry.currentTaskTitle = task.title;
+        }
+      }
+      if (task.status === "completed" || task.status === "failed" || task.status === "canceled") {
+        entry.terminal += 1;
+      }
+    }
+
+    // Derive status and emit changes
+    for (const agent of agents) {
+      const summary = agentTasks.get(agent.name)!;
+      let derivedStatus: "idle" | "active" | "completed";
+
+      if (summary.active > 0) {
+        derivedStatus = "active";
+      } else if (summary.total > 0 && summary.terminal === summary.total) {
+        derivedStatus = "completed";
+      } else {
+        derivedStatus = "idle";
+      }
+
+      const prevStatus = this.agentDashboardStatus.get(agent.name) ?? "idle";
+      if (derivedStatus !== prevStatus) {
+        this.agentDashboardStatus.set(agent.name, derivedStatus);
+
+        if (derivedStatus === "active") {
+          this.emitter.broadcastDashboardEvent({
+            type: "AGENT_ACTIVE",
+            timestamp: now,
+            data: {
+              name: agent.name,
+              taskId: summary.currentTaskTitle,
+            },
+          });
+        } else if (derivedStatus === "completed") {
+          this.emitter.broadcastDashboardEvent({
+            type: "AGENT_COMPLETED",
+            timestamp: now,
+            data: { name: agent.name },
+          });
+        }
+        // idle transitions don't need an explicit event (AGENT_REGISTERED already sets idle)
+      }
     }
   }
 

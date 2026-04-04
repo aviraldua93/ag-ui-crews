@@ -43,7 +43,7 @@ function formatTimestamp(ts: number): string {
   return new Date(ts).toLocaleTimeString("en-US", { hour12: false });
 }
 
-function summarize(event: DashboardEvent): string {
+export function summarize(event: DashboardEvent): string {
   const d = event.data;
   switch (event.type) {
     case "CREW_PLAN_STARTED": return "Planning crew\u2026";
@@ -69,6 +69,46 @@ function summarize(event: DashboardEvent): string {
     case "STATE_SNAPSHOT": return "State snapshot";
     default: return event.type;
   }
+}
+
+// ─── Pure Filtering Logic (testable) ───────────────────────────────────────────
+
+/** Excludes internal-only events (METRICS_UPDATE, STATE_SNAPSHOT) from display. */
+export function excludeInternalEvents(events: DashboardEvent[]): DashboardEvent[] {
+  return events.filter((e) => e.type !== "METRICS_UPDATE" && e.type !== "STATE_SNAPSHOT");
+}
+
+/**
+ * Filters events by active categories and/or text search query.
+ * Pure function extracted for testability.
+ *
+ * - If no categories active AND no search query → returns all events unchanged
+ * - Category filter: event must belong to one of the active categories
+ * - Text search: case-insensitive match against summarize() output
+ * - Both filters are combined with AND logic
+ */
+export function filterEvents(
+  events: DashboardEvent[],
+  activeCategories: Set<EventCategory>,
+  searchQuery: string,
+): DashboardEvent[] {
+  const hasCategories = activeCategories.size > 0;
+  const lowerSearch = searchQuery.toLowerCase();
+  const hasSearch = lowerSearch.length > 0;
+
+  if (!hasCategories && !hasSearch) return events;
+
+  return events.filter((event) => {
+    if (hasCategories) {
+      const cat = getEventCategory(event.type);
+      if (!cat || !activeCategories.has(cat)) return false;
+    }
+    if (hasSearch) {
+      const summary = summarize(event).toLowerCase();
+      if (!summary.includes(lowerSearch)) return false;
+    }
+    return true;
+  });
 }
 
 // ─── EventLogFilter Sub-Component ──────────────────────────────────────────────
@@ -208,27 +248,10 @@ export function EventLog({ events }: EventLogProps) {
   );
 
   // Apply user category + text search filters
-  const filtered = useMemo(() => {
-    const hasCategories = activeCategories.size > 0;
-    const lowerSearch = debouncedSearch.toLowerCase();
-    const hasSearch = lowerSearch.length > 0;
-
-    if (!hasCategories && !hasSearch) return baseFiltered;
-
-    return baseFiltered.filter((event) => {
-      // Category filter: event must belong to an active category
-      if (hasCategories) {
-        const cat = getEventCategory(event.type);
-        if (!cat || !activeCategories.has(cat)) return false;
-      }
-      // Text search filter: summarize() output must include the query
-      if (hasSearch) {
-        const summary = summarize(event).toLowerCase();
-        if (!summary.includes(lowerSearch)) return false;
-      }
-      return true;
-    });
-  }, [baseFiltered, activeCategories, debouncedSearch]);
+  const filtered = useMemo(
+    () => filterEvents(baseFiltered, activeCategories, debouncedSearch),
+    [baseFiltered, activeCategories, debouncedSearch],
+  );
 
   // Auto-scroll: trigger when filtered list changes and new events pass filters
   useEffect(() => {

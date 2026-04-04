@@ -173,8 +173,8 @@ export interface BridgeTask {
  * ```
  */
 export interface BridgeStatus {
-  /** Number of agents currently registered with the bridge. */
-  agents: number;
+  /** Agent counts (summary from bridge). */
+  agents: number | { total: number; online?: number; busy?: number; idle?: number; offline?: number };
   /** Breakdown of task counts by {@link TaskStatus}. */
   tasks: {
     /** Total number of tasks across all statuses. */
