@@ -340,14 +340,31 @@ export class BridgeConnector {
       // Diff agents
       this.diffAgents(agents);
 
-      // Diff tasks and detect wave transitions
+      // Diff tasks
       this.diffTasks(tasks);
 
-      // Update status metrics
+      // Emit aggregate metrics from bridge status (source of truth)
+      const prev = this.prevState.status;
+      if (
+        !prev ||
+        prev.tasks.completed !== status.tasks.completed ||
+        prev.tasks.total !== status.tasks.total
+      ) {
+        this.emitter.broadcastDashboardEvent({
+          type: "METRICS_UPDATE",
+          timestamp: Date.now(),
+          data: {
+            taskCount: status.tasks.total,
+            completedTasks: status.tasks.completed,
+            failedTasks: status.tasks.failed,
+            agentCount: status.agents.total,
+          },
+        });
+      }
+
       this.prevState.status = status;
     } catch (err) {
       console.error("[bridge] Poll failed:", err);
-      // If bridge goes away, disconnect
       if (this.connected) {
         this.stop();
         this.emitter.broadcastDashboardEvent({

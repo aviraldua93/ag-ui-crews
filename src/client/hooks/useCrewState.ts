@@ -34,7 +34,8 @@ export function useCrewState(state: DashboardState): DerivedCrewState {
 
   const elapsedTime = useMemo(() => {
     if (!state.startedAt) return 0;
-    return Math.floor((now - state.startedAt) / 1000);
+    const elapsed = Math.floor((now - state.startedAt) / 1000);
+    return Math.max(0, elapsed);
   }, [state.startedAt, now]);
 
   const agentsByStatus = useMemo(() => {
