@@ -1,6 +1,7 @@
 import { useState, useCallback } from "react";
-import { Radio, Play, Square, Clock, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Radio, Play, Square, Clock, Wifi, WifiOff, Loader2, Sun, Moon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useTheme } from "../hooks/useTheme";
 import type { DashboardPhase } from "@shared/types";
 
 interface HeaderProps {
@@ -39,6 +40,7 @@ export function Header({
 }: HeaderProps) {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [bridgeUrl, setBridgeUrl] = useState("http://localhost:8000");
+  const { theme, toggleTheme } = useTheme();
   const p = phaseConfig[phase];
 
   const handleConnect = useCallback(() => {
@@ -51,7 +53,7 @@ export function Header({
   }, [showUrlInput, bridgeUrl, onConnect]);
 
   return (
-    <header className="flex items-center justify-between px-6 py-3 bg-gray-900/80 backdrop-blur-sm border-b border-gray-800/50">
+    <header className="flex items-center justify-between px-6 py-3 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200/50 dark:border-gray-800/50">
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center">
@@ -74,7 +76,7 @@ export function Header({
                     : "bg-gray-500"
             }`}
           />
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             {isConnected ? "Connected" : error ? "Error" : phase === "connecting" ? "Connecting…" : "Disconnected"}
           </span>
         </div>
@@ -89,11 +91,44 @@ export function Header({
 
       <div className="flex items-center gap-4">
         {phase !== "idle" && (
-          <div className="flex items-center gap-1.5 text-gray-400 font-mono text-sm">
+          <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 font-mono text-sm">
             <Clock className="w-3.5 h-3.5" />
             <span>{formatTime(elapsedTime)}</span>
           </div>
         )}
+
+        <button
+          data-testid="theme-toggle"
+          onClick={toggleTheme}
+          className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 transition-colors"
+          aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {theme === "dark" ? (
+              <motion.span
+                key="moon"
+                initial={{ opacity: 0, rotate: -90, scale: 0.5 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: 90, scale: 0.5 }}
+                transition={{ duration: 0.25 }}
+                className="absolute"
+              >
+                <Moon className="w-4 h-4 text-violet-400" />
+              </motion.span>
+            ) : (
+              <motion.span
+                key="sun"
+                initial={{ opacity: 0, rotate: 90, scale: 0.5 }}
+                animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                exit={{ opacity: 0, rotate: -90, scale: 0.5 }}
+                transition={{ duration: 0.25 }}
+                className="absolute"
+              >
+                <Sun className="w-4 h-4 text-amber-500" />
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
 
         <AnimatePresence mode="wait">
           {showUrlInput && (
@@ -101,7 +136,7 @@ export function Header({
               initial={{ width: 0, opacity: 0 }}
               animate={{ width: 220, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
+              className="bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-1 focus:ring-violet-500"
               placeholder="Bridge URL…"
               value={bridgeUrl}
               onChange={(e) => setBridgeUrl(e.target.value)}

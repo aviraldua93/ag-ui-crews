@@ -142,9 +142,25 @@ export class BridgeConnector {
 
   private async fetchAgents(): Promise<BridgeAgent[]> {
     try {
-      const resp = await fetch(`${this.bridgeUrl}/agents`);
+      // a2a-crews bridge returns agents under /status, not /agents
+      const resp = await fetch(`${this.bridgeUrl}/status`);
       if (!resp.ok) return [];
-      return (await resp.json()) as BridgeAgent[];
+      const status = (await resp.json()) as {
+        agents?: {
+          list?: Array<{
+            name: string;
+            description: string;
+            skills?: string[];
+            status: string;
+          }>;
+        };
+      };
+      return (status.agents?.list ?? []).map((a) => ({
+        name: a.name,
+        description: a.description,
+        skills: a.skills ?? [],
+        registeredAt: new Date().toISOString(),
+      }));
     } catch {
       return [];
     }
@@ -154,10 +170,41 @@ export class BridgeConnector {
     try {
       const resp = await fetch(`${this.bridgeUrl}/tasks`);
       if (!resp.ok) return [];
-      return (await resp.json()) as BridgeTask[];
+      const raw = (await resp.json()) as Array<{
+        id: string;
+        assignedTo: string;
+        status: string;
+        message?: string;
+        result?: string;
+        createdAt?: string;
+        updatedAt?: string;
+      }>;
+      return raw.map((t) => ({
+        id: t.id,
+        title: t.message ?? "Task",
+        assignedTo: t.assignedTo,
+        status: this.mapTaskStatus(t.status),
+        dependsOn: [],
+        wave: 0,
+        result: t.result,
+        createdAt: t.createdAt ?? new Date().toISOString(),
+        updatedAt: t.updatedAt ?? new Date().toISOString(),
+      }));
     } catch {
       return [];
     }
+  }
+
+  private mapTaskStatus(status: string): TaskStatus {
+    const map: Record<string, TaskStatus> = {
+      pending: "pending",
+      submitted: "submitted",
+      working: "working",
+      completed: "completed",
+      failed: "failed",
+      canceled: "canceled",
+    };
+    return map[status] ?? "submitted";
   }
 
   // ─── Diffing ──────────────────────────────────────────────────────────────

@@ -5,8 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ag-ui-crews — Mission Control</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Hydrate theme before first paint to prevent flash of wrong theme
+      (function() {
+        try {
+          var theme = localStorage.getItem('ag-ui-crews-theme');
+          if (theme === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else {
+            document.documentElement.classList.add('dark');
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-gray-950 text-gray-100 antialiased">
+  <body class="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100 antialiased">
     <div id="root"></div>
     <script type="module" src="/src/client/main.tsx"></script>
   </body>

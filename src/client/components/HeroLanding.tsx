@@ -1,12 +1,22 @@
-import { motion } from "framer-motion";
-import { Sparkles, Wifi, Play } from "lucide-react";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Sparkles, Wifi, Play, ArrowRight, X } from "lucide-react";
 
 interface HeroLandingProps {
-  onConnect: () => void;
+  onConnect: (url: string) => void;
   onSimulate: () => void;
 }
 
 export function HeroLanding({ onConnect, onSimulate }: HeroLandingProps) {
+  const [showConnect, setShowConnect] = useState(false);
+  const [bridgeUrl, setBridgeUrl] = useState("http://localhost:");
+
+  const handleConnect = () => {
+    if (bridgeUrl.trim()) {
+      onConnect(bridgeUrl.trim());
+    }
+  };
+
   return (
     <div className="flex-1 flex items-center justify-center relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
@@ -57,29 +67,85 @@ export function HeroLanding({ onConnect, onSimulate }: HeroLandingProps) {
         </p>
         <p className="text-sm text-gray-500 mb-10 max-w-md mx-auto">
           Watch your AI agent crews plan, execute, and deliver in real-time.
-          Connect to a live bridge or run a simulation to see it in action.
+          Connect to a live a2a-crews bridge or run a simulation.
         </p>
 
-        <div className="flex items-center justify-center gap-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onConnect}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-200 hover:border-violet-500/50 hover:text-white transition-all shadow-lg shadow-black/20"
-          >
-            <Wifi className="w-4 h-4" />
-            Connect to Bridge
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.97 }}
-            onClick={onSimulate}
-            className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500 transition-all shadow-lg shadow-violet-500/20"
-          >
-            <Play className="w-4 h-4" />
-            Run Simulation
-          </motion.button>
-        </div>
+        <AnimatePresence mode="wait">
+          {showConnect ? (
+            <motion.div
+              key="connect-form"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex flex-col items-center gap-3"
+            >
+              <p className="text-xs text-gray-400 mb-1">
+                Enter the a2a-crews bridge URL (shown when you run <code className="text-violet-400">crews launch</code>)
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={bridgeUrl}
+                  onChange={(e) => setBridgeUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleConnect();
+                    if (e.key === "Escape") setShowConnect(false);
+                  }}
+                  placeholder="http://localhost:62647"
+                  autoFocus
+                  className="w-72 px-4 py-3 rounded-xl text-sm bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent font-mono"
+                />
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={handleConnect}
+                  className="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-500 text-white transition-colors shadow-lg shadow-violet-500/20"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  Go
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.97 }}
+                  onClick={() => setShowConnect(false)}
+                  className="p-3 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </motion.button>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                Don't have a2a-crews running? Try <button onClick={onSimulate} className="text-fuchsia-400 hover:text-fuchsia-300 underline underline-offset-2">Run Simulation</button> instead
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="buttons"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center justify-center gap-4"
+            >
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => setShowConnect(true)}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gray-900/80 backdrop-blur-sm border border-gray-700 text-gray-200 hover:border-violet-500/50 hover:text-white transition-all shadow-lg shadow-black/20"
+              >
+                <Wifi className="w-4 h-4" />
+                Connect to Bridge
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={onSimulate}
+                className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500 transition-all shadow-lg shadow-violet-500/20"
+              >
+                <Play className="w-4 h-4" />
+                Run Simulation
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );

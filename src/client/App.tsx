@@ -46,7 +46,7 @@ export function App() {
   }, [reset]);
 
   return (
-    <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
+    <div className="flex flex-col h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
       <Header
         phase={state.phase}
         isConnected={isConnected}
@@ -67,7 +67,7 @@ export function App() {
             className="flex-1 flex"
           >
             <HeroLanding
-              onConnect={() => handleConnect("http://localhost:8000")}
+              onConnect={handleConnect}
               onSimulate={handleSimulate}
             />
           </motion.div>
