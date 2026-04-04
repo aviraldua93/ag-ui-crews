@@ -345,7 +345,15 @@ function reducer(state: DashboardState, action: Action): DashboardState {
           return { ...state, eventLog };
 
         case "STATE_SNAPSHOT":
-          return { ...(data.state as DashboardState), eventLog };
+          // Full state replacement if data.state exists
+          if (data.state) {
+            return { ...(data.state as DashboardState), eventLog };
+          }
+          // Partial update — e.g. { phase: "completed" }
+          if (data.phase) {
+            return { ...state, eventLog, phase: data.phase as DashboardState["phase"] };
+          }
+          return { ...state, eventLog };
 
         default:
           return { ...state, eventLog };
