@@ -64,6 +64,9 @@ test.describe("Theme Toggle", () => {
     await page.getByTestId("theme-toggle").click();
     await expect(page.locator("html")).not.toHaveClass(/dark/);
 
+    // Wait a frame for CSS to recompute after class-based theme change
+    await page.evaluate(() => new Promise(requestAnimationFrame));
+
     // Capture light mode background
     const lightBg = await header.evaluate(
       (el) => getComputedStyle(el).backgroundColor
@@ -112,10 +115,10 @@ test.describe("Theme Toggle", () => {
     // App title should be visible
     await expect(page.locator("text=ag-ui-crews").first()).toBeVisible();
 
-    // Hero landing should be visible in idle state (Mission Control text)
-    await expect(page.locator("text=Mission Control")).toBeVisible();
-    await expect(page.locator("text=Run Simulation")).toBeVisible();
-    await expect(page.locator("text=Connect to Bridge")).toBeVisible();
+    // Hero landing should be visible in idle state — current text after redesign
+    await expect(
+      page.locator("text=Waiting for crews").first()
+    ).toBeVisible({ timeout: 10_000 });
 
     // Buttons should be functional
     const simulateBtn = page.locator("button", { hasText: "Simulate" });

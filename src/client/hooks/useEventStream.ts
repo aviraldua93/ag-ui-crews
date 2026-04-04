@@ -114,7 +114,15 @@ function reducer(state: DashboardState, action: Action): DashboardState {
               retryCount: 0,
             })),
           }));
-          return { ...state, eventLog, phase: "executing", plan, tasks, waves };
+          return {
+            ...state,
+            eventLog,
+            phase: "executing",
+            plan,
+            tasks,
+            waves,
+            metrics: { ...state.metrics, taskCount: tasks.length },
+          };
         }
 
         case "CREW_PLAN_FAILED":
@@ -330,7 +338,7 @@ function reducer(state: DashboardState, action: Action): DashboardState {
         }
 
         case "METRICS_UPDATE": {
-          const incoming = data.metrics as Partial<CrewMetrics>;
+          const incoming = ((data.metrics as Partial<CrewMetrics>) ?? data) as Partial<CrewMetrics>;
           return {
             ...state,
             eventLog,

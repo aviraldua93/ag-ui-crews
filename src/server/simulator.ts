@@ -1,6 +1,25 @@
 /**
- * Simulation mode for ag-ui-crews
- * Generates realistic crew execution events with staggered timing for demo/testing.
+ * Simulation engine for ag-ui-crews.
+ *
+ * Provides a fully self-contained simulation mode that generates realistic crew
+ * execution events with staggered timing, suitable for demos, UI development,
+ * and integration testing without requiring a live a2a-crews bridge.
+ *
+ * The simulation follows a **5-phase lifecycle**:
+ * 1. **Planning** — Emits `CREW_PLAN_STARTED`, waits 2 s, then `CREW_PLAN_COMPLETED`
+ *    with the full {@link CrewPlan}.
+ * 2. **Agent registration** — Emits `AGENT_REGISTERED` for each role with 200 ms
+ *    spacing.
+ * 3. **Wave execution** — Iterates through waves sequentially; within each wave,
+ *    tasks run in parallel via `Promise.all` with staggered starts.
+ * 4. **Metrics** — Emits a `METRICS_UPDATE` with aggregate timing and counts.
+ * 5. **Completion** — Emits a `STATE_SNAPSHOT` with `phase: "completed"`.
+ *
+ * Tasks may randomly fail (controlled by `failureRate`) and are automatically
+ * retried once. Each task produces a markdown artifact from
+ * {@link ARTIFACT_TEMPLATES}.
+ *
+ * @module server/simulator
  */
 import type {
   SimulationConfig,
@@ -15,6 +34,19 @@ import { v4 as uuidv4 } from "uuid";
 
 // ─── Scenario Templates ────────────────────────────────────────────────────────
 
+/**
+ * Internal plan structure used by the simulation engine.
+ *
+ * Represents the pre-built scenario that drives the simulation. The default
+ * scenario (built by {@link buildSimulationPlan}) defines:
+ * - **4 roles**: architect, backend-dev, frontend-dev, reviewer
+ * - **6 tasks**: design → implement-api + implement-ui → review + test → integrate
+ * - **4 waves**: one per dependency tier
+ *
+ * The plan mirrors the shape of {@link CrewPlan} but includes the
+ * {@link FeasibilityAssessment} at the same level for convenience during
+ * simulation setup.
+ */
 interface SimulationPlan {
   scenario: string;
   roles: PlanRole[];
@@ -23,6 +55,25 @@ interface SimulationPlan {
   feasibility: FeasibilityAssessment;
 }
 
+/**
+ * Maps task IDs to markdown artifact generators.
+ *
+ * Each key corresponds to a task ID in the default simulation plan. The value
+ * is a function that accepts the task title and returns a markdown string
+ * representing the artifact that task "produced". The templates are:
+ *
+ * | Key              | Artifact Description |
+ * |------------------|----------------------|
+ * | `design`         | Architecture design document with component breakdown and decisions. |
+ * | `implement-api`  | API implementation report listing endpoints, middleware, and status. |
+ * | `implement-ui`   | UI implementation report listing React components and stack choices. |
+ * | `review`         | Code review summary with findings and verdict. |
+ * | `test`           | Test report with suite results, coverage percentages, and integration test outcomes. |
+ * | `integrate`      | Integration/deployment checklist with final status. |
+ *
+ * If a task ID has no matching template key, the `design` template is used as
+ * a fallback.
+ */
 const ARTIFACT_TEMPLATES: Record<string, (title: string) => string> = {
   design: (title) =>
     `# Architecture Design: ${title}\n\n## Overview\nMicroservice architecture with REST API layer.\n\n## Components\n- API Gateway (Express/Fastify)\n- Auth Service (JWT + bcrypt)\n- Database Layer (PostgreSQL)\n- Cache Layer (Redis)\n\n## Decisions\n- Use repository pattern for data access\n- Event-driven communication between services\n- OpenAPI 3.0 specification for all endpoints\n`,
@@ -43,6 +94,27 @@ const ARTIFACT_TEMPLATES: Record<string, (title: string) => string> = {
     `# Integration Report: ${title}\n\n## Deployment Checklist\n- [x] All services containerized (Docker)\n- [x] Docker Compose for local dev\n- [x] CI/CD pipeline configured\n- [x] Environment variables documented\n- [x] Database migrations ready\n- [x] Smoke tests passing\n\n## Final Status\nAll components integrated and verified.\nReady for staging deployment.\n`,
 };
 
+/**
+ * Builds the default simulation plan from a {@link SimulationConfig}.
+ *
+ * Constructs a 4-role, 6-task, 4-wave scenario representing a typical
+ * "Build a REST API with auth and tests" crew execution:
+ *
+ * - **Wave 0**: `design` (architect)
+ * - **Wave 1**: `implement-api` (backend-dev) + `implement-ui` (frontend-dev)
+ * - **Wave 2**: `review` (reviewer) + `test` (backend-dev)
+ * - **Wave 3**: `integrate` (architect)
+ *
+ * The `config.scenario` string overrides the default scenario name but does
+ * not change the task/role structure. Agent count, wave count, and other
+ * config overrides affect simulation timing but not the plan topology.
+ *
+ * A hard-coded {@link FeasibilityAssessment} with `verdict: "go"` and
+ * `confidence: 0.82` is included, along with two representative concerns.
+ *
+ * @param config - The {@link SimulationConfig} from the `/api/simulate` request body.
+ * @returns A fully populated {@link SimulationPlan} ready for execution.
+ */
 function buildSimulationPlan(config: SimulationConfig): SimulationPlan {
   const scenario =
     config.scenario || "Build a REST API with auth and tests";
@@ -115,6 +187,34 @@ function buildSimulationPlan(config: SimulationConfig): SimulationPlan {
 
 // ─── Simulation Engine ──────────────────────────────────────────────────────────
 
+/**
+ * Entry point for simulation mode: kicks off an asynchronous simulation run
+ * and returns a cleanup function to abort it.
+ *
+ * The simulation progresses through a 5-phase lifecycle:
+ * 1. **Planning** (≈2 s) — Emits `CREW_PLAN_STARTED` and `CREW_PLAN_COMPLETED`.
+ * 2. **Agent registration** (≈0.8 s) — Emits `AGENT_REGISTERED` × 4 roles.
+ * 3. **Wave execution** (variable) — Runs 4 waves sequentially; tasks within
+ *    each wave execute in parallel with staggered starts (300 ms per task).
+ *    Tasks may fail randomly and retry once.
+ * 4. **Metrics** — Emits a `METRICS_UPDATE` with aggregate totals.
+ * 5. **Completion** — Emits `STATE_SNAPSHOT` with `phase: "completed"`.
+ *
+ * All timing is divided by `config.speedMultiplier` (default 1×), allowing
+ * faster or slower playback. The `config.failureRate` (default 0.15) controls
+ * the probability that a task fails on its first attempt.
+ *
+ * The returned cleanup function sets an internal `stopped` flag and clears all
+ * pending timers. Once called, no further events are emitted. The cleanup is
+ * idempotent and safe to call multiple times.
+ *
+ * @param config  - Simulation parameters: scenario name, speed, failure rate, etc.
+ *                  See {@link SimulationConfig} for the full shape.
+ * @param emitter - The shared {@link EventEmitter} that receives dashboard events
+ *                  and forwards them to SSE clients.
+ * @returns A cleanup function that stops the simulation immediately when invoked.
+ *          All pending `setTimeout` timers are cleared and no further events are emitted.
+ */
 export function startSimulation(
   config: SimulationConfig,
   emitter: EventEmitter
@@ -260,6 +360,32 @@ export function startSimulation(
 
   // ─── Task simulation helper ─────────────────────────────────────────────────
 
+  /**
+   * Simulates a single task's lifecycle within a wave.
+   *
+   * Executes the following sequence of events:
+   * 1. **Staggered start** — Waits `taskIdx * 300 ms` so parallel tasks don't
+   *    fire simultaneously (provides a more realistic visual cascade).
+   * 2. **Submission** — Emits `TASK_SUBMITTED` and `AGENT_ACTIVE`.
+   * 3. **Working** — Emits `TASK_WORKING`, then waits 1–3 s (random).
+   * 4. **Failure/retry** (conditional) — If `Math.random() < failRate` and the
+   *    wave is 1 or 2 (not the first or last), emits `TASK_FAILED` →
+   *    `AGENT_RETRYING` → `TASK_RETRYING` → `TASK_WORKING`, then waits 1.5 s.
+   * 5. **Artifact generation** — Looks up the task ID in
+   *    {@link ARTIFACT_TEMPLATES} (falls back to `design` template) and emits
+   *    `ARTIFACT_PRODUCED`.
+   * 6. **Completion** — Emits `TASK_COMPLETED` and `AGENT_COMPLETED`.
+   *
+   * The function respects the `stopped` flag: at each `await delay(...)` point,
+   * if the simulation has been cancelled, it returns immediately.
+   *
+   * @param task         - The {@link PlanTask} to simulate.
+   * @param waveIdx      - Zero-based index of the current wave (used for failure eligibility).
+   * @param taskIdx      - Zero-based position of this task within the wave (used for stagger).
+   * @param waveDuration - Intended wave duration in ms (currently unused for per-task timing
+   *                       but reserved for future pacing adjustments).
+   * @param failRate     - Probability (0–1) that this task will fail on its first attempt.
+   */
   async function simulateTask(
     task: PlanTask,
     waveIdx: number,

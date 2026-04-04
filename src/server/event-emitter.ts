@@ -1,6 +1,28 @@
 /**
- * SSE event hub for ag-ui-crews
- * Manages connected clients, broadcasts AG-UI events, and maintains dashboard state.
+ * SSE event hub and state reducer for ag-ui-crews.
+ *
+ * This module contains the {@link EventEmitter} class — the central nervous system
+ * of the server. It serves three responsibilities:
+ *
+ * 1. **Client connection management** — Maintains a set of SSE
+ *    {@link ReadableStreamDefaultController}s. New clients receive an immediate
+ *    `STATE_SNAPSHOT` event so the UI can hydrate without a round-trip.
+ *
+ * 2. **State reduction** — Maintains the canonical {@link DashboardState} in memory.
+ *    Every incoming {@link DashboardEvent} is applied through a switch-based reducer
+ *    ({@link EventEmitter.applyEvent | applyEvent}) that mutates state before events
+ *    are forwarded to clients. This guarantees that the SSE stream and the REST
+ *    `GET /api/state` endpoint always reflect the same truth.
+ *
+ * 3. **AG-UI protocol translation** — Delegates to
+ *    {@link ../shared/events.translateToAgUi | translateToAgUi} to convert
+ *    dashboard-specific events into AG-UI protocol events (steps, text messages,
+ *    state deltas, custom events) before encoding them as SSE frames.
+ *
+ * The emitter is shared as a singleton by all route handlers, the simulator,
+ * and the bridge connector.
+ *
+ * @module server/event-emitter
  */
 import type {
   DashboardEvent,
@@ -23,14 +45,46 @@ import {
   encodeSSE,
 } from "../shared/events";
 
+/** Type alias for the controller side of a `ReadableStream<Uint8Array>` used by SSE clients. */
 type SSEController = ReadableStreamDefaultController<Uint8Array>;
 
+/**
+ * Central SSE hub that manages client connections, maintains the canonical
+ * {@link DashboardState}, and translates {@link DashboardEvent}s into AG-UI
+ * protocol events for real-time streaming.
+ *
+ * All mutations to dashboard state flow through this class's
+ * {@link broadcastDashboardEvent} method, which first applies the event to
+ * the in-memory state via the {@link applyEvent | private reducer}, then
+ * translates the event to AG-UI wire format and pushes it to every connected
+ * SSE client.
+ *
+ * The class is designed as a singleton per server process — the module-level
+ * `emitter` instance in `index.ts` is shared by route handlers, the simulator,
+ * and the bridge connector.
+ */
 export class EventEmitter {
+  /** Set of currently connected SSE client stream controllers. */
   private clients = new Set<SSEController>();
+  /** Canonical dashboard state — mutated in-place by the {@link applyEvent} reducer. */
   private state: DashboardState = structuredClone(INITIAL_DASHBOARD_STATE);
+  /** Shared TextEncoder instance for converting SSE string frames to `Uint8Array`. */
   private encoder = new TextEncoder();
 
-  /** Register a new SSE client and send current state snapshot */
+  /**
+   * Registers a new SSE client and immediately sends the current
+   * {@link DashboardState} as a `STATE_SNAPSHOT` AG-UI event.
+   *
+   * This ensures that clients connecting mid-session see the full current state
+   * without needing to replay the event log. If the initial enqueue fails
+   * (e.g., the client disconnected before the snapshot could be sent), the
+   * controller is silently removed from the client set.
+   *
+   * @param controller - The {@link ReadableStreamDefaultController} for the new
+   *                     SSE connection's `ReadableStream<Uint8Array>`.
+   *
+   * @sideEffect Sends a `STATE_SNAPSHOT` SSE frame to the newly added client.
+   */
   addClient(controller: SSEController): void {
     this.clients.add(controller);
     const snap = stateSnapshot(this.state);
@@ -41,12 +95,30 @@ export class EventEmitter {
     }
   }
 
-  /** Remove a disconnected client */
+  /**
+   * Unregisters a disconnected SSE client.
+   *
+   * Called from the `ReadableStream`'s `cancel` callback when the client drops
+   * the connection. After removal, subsequent broadcasts skip this controller.
+   *
+   * @param controller - The controller to remove from the client set.
+   */
   removeClient(controller: SSEController): void {
     this.clients.delete(controller);
   }
 
-  /** Broadcast raw AG-UI events to all connected SSE clients */
+  /**
+   * Broadcasts pre-built AG-UI events to all connected SSE clients.
+   *
+   * Events are serialised to SSE `data:` frames via {@link encodeSSEBatch},
+   * then encoded to `Uint8Array` once and enqueued to every controller. If a
+   * controller throws during enqueue (client disconnected), it is automatically
+   * removed from the client set — this is the primary garbage-collection
+   * mechanism for stale connections.
+   *
+   * @param events - One or more {@link AgUiEvent} objects to send. If the array
+   *                 is empty, the method returns immediately (no-op optimisation).
+   */
   broadcast(events: AgUiEvent[]): void {
     if (events.length === 0) return;
     const payload = this.encoder.encode(encodeSSEBatch(events));
@@ -59,32 +131,101 @@ export class EventEmitter {
     }
   }
 
-  /** Apply a dashboard event to state, translate to AG-UI, and broadcast */
+  /**
+   * The primary event ingestion method: applies a dashboard event to state,
+   * translates it to AG-UI protocol events, and broadcasts to all SSE clients.
+   *
+   * This is the method called by the simulator, bridge connector, and route
+   * handlers to push state changes through the system. The sequence is:
+   * 1. {@link applyEvent} mutates in-memory {@link DashboardState}.
+   * 2. {@link translateToAgUi} converts the event to one or more AG-UI events.
+   * 3. {@link broadcast} serialises and enqueues the AG-UI events.
+   *
+   * @param event - The {@link DashboardEvent} to process. Must have a valid
+   *                `type`, `timestamp`, and `data` payload.
+   *
+   * @sideEffect Mutates `this.state` and sends SSE frames to all clients.
+   */
   broadcastDashboardEvent(event: DashboardEvent): void {
     this.applyEvent(event);
     const aguiEvents = translateToAgUi(event);
     this.broadcast(aguiEvents);
   }
 
-  /** Get a snapshot of current dashboard state */
+  /**
+   * Returns a deep clone of the current {@link DashboardState}.
+   *
+   * Used by the `GET /api/state` route to provide a point-in-time snapshot
+   * without exposing the mutable internal state to consumers.
+   *
+   * @returns A deep-cloned copy of the dashboard state.
+   */
   getState(): DashboardState {
     return structuredClone(this.state);
   }
 
-  /** Reset state to initial (used when stopping a session) */
+  /**
+   * Resets the dashboard state to {@link INITIAL_DASHBOARD_STATE} and broadcasts
+   * a `STATE_SNAPSHOT` to all clients so their UIs return to the idle screen.
+   *
+   * Called by `handleStop()` and at the beginning of `handleConnect()` /
+   * `handleSimulate()` to ensure a clean slate before starting a new session.
+   *
+   * @sideEffect Replaces `this.state` with a fresh clone and sends a snapshot.
+   */
   reset(): void {
     this.state = structuredClone(INITIAL_DASHBOARD_STATE);
     const snap = stateSnapshot(this.state);
     this.broadcast([snap]);
   }
 
-  /** Number of connected SSE clients */
+  /**
+   * The number of SSE clients currently connected.
+   *
+   * Exposed as a getter for the `GET /api/health` endpoint.
+   *
+   * @returns The size of the internal client set.
+   */
   get clientCount(): number {
     return this.clients.size;
   }
 
   // ─── State Reducer ──────────────────────────────────────────────────────────
 
+  /**
+   * State reducer that applies a {@link DashboardEvent} to the in-memory
+   * {@link DashboardState}.
+   *
+   * Every event is first appended to `state.eventLog` for audit/replay, then
+   * the switch-case mutates the relevant state slice. The 18 handled event
+   * types and their state mutations are:
+   *
+   * | Event Type            | State Mutation |
+   * |-----------------------|----------------|
+   * | `BRIDGE_CONNECTED`    | Sets phase → `"connecting"`, stores `bridgeUrl`, records `startedAt`. |
+   * | `BRIDGE_DISCONNECTED` | Sets phase → `"idle"`, clears `bridgeUrl`. |
+   * | `CREW_PLAN_STARTED`   | Sets phase → `"planning"`, records `startedAt` if not set. |
+   * | `CREW_PLAN_COMPLETED` | Sets phase → `"executing"`, stores the full {@link CrewPlan}, initialises waves and flat task list, updates metrics (`taskCount`, `waveCount`). |
+   * | `CREW_PLAN_FAILED`    | Sets phase → `"error"`, stores error message. |
+   * | `WAVE_STARTED`        | Sets wave status → `"active"`, records `startedAt`. |
+   * | `WAVE_COMPLETED`      | Sets wave status → `"completed"`, records `completedAt`. |
+   * | `WAVE_FAILED`         | Sets wave status → `"failed"`, records `completedAt`. |
+   * | `AGENT_REGISTERED`    | Pushes a new {@link AgentState} (deduplicated by name), updates `metrics.agentCount`. |
+   * | `AGENT_ACTIVE`        | Sets agent status → `"active"`, stores `currentTask` and `startedAt`. |
+   * | `AGENT_COMPLETED`     | Sets agent status → `"completed"`, records `completedAt`, clears `currentTask`. |
+   * | `AGENT_FAILED`        | Sets agent status → `"failed"`, clears `currentTask`. |
+   * | `AGENT_RETRYING`      | Sets agent status → `"retrying"`, increments `retryCount`. |
+   * | `TASK_SUBMITTED`      | Sets task status → `"submitted"`. |
+   * | `TASK_WORKING`        | Sets task status → `"working"`, records `startedAt`. |
+   * | `TASK_COMPLETED`      | Sets task status → `"completed"`, records `completedAt` and optional `artifact`, increments `metrics.completedTasks`. |
+   * | `TASK_FAILED`         | Sets task status → `"failed"`, records `completedAt`, increments `metrics.failedTasks`. |
+   * | `TASK_RETRYING`       | Resets task status → `"submitted"`, increments task and global `retryCount`. |
+   * | `ARTIFACT_PRODUCED`   | Pushes a new {@link Artifact} to `state.artifacts`. |
+   * | `METRICS_UPDATE`      | Merges partial metric overrides (`totalTime`, `completedTasks`, `failedTasks`). |
+   * | `STATE_SNAPSHOT`      | Full state replacement (if `data.state`) or partial phase update (if `data.phase`), preserving `eventLog`. |
+   *
+   * @param event - The dashboard event to reduce into state.
+   */
   private applyEvent(event: DashboardEvent): void {
     // Always log the event
     this.state.eventLog.push(event);
@@ -317,6 +458,19 @@ export class EventEmitter {
     }
   }
 
+  /**
+   * Locates a {@link TaskState} by ID using a dual-lookup strategy.
+   *
+   * 1. **Primary lookup** — Searches the flat `state.tasks` array, which is the
+   *    authoritative source after `CREW_PLAN_COMPLETED` flattens all wave tasks.
+   * 2. **Fallback lookup** — If not found in the flat list (e.g., during edge-case
+   *    timing issues), iterates through each wave's `tasks` array. These should be
+   *    the same object references as the flat list, but the fallback ensures
+   *    robustness when state is partially initialised.
+   *
+   * @param taskId - The unique task identifier to search for.
+   * @returns The matching {@link TaskState}, or `undefined` if no task with that ID exists.
+   */
   private findTask(taskId: string): TaskState | undefined {
     // Search in flat tasks list
     const task = this.state.tasks.find((t) => t.id === taskId);
