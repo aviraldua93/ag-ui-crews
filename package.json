@@ -1,0 +1,61 @@
+{
+  "name": "ag-ui-crews",
+  "version": "0.1.0",
+  "author": "Aviral Dua",
+  "description": "Real-time dashboard for a2a-crews — built on the AG-UI protocol. Watch your AI agent crews plan, execute, and deliver in a live web UI.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aviraldua93/ag-ui-crews.git"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently \"bun run dev:server\" \"bun run dev:client\"",
+    "dev:server": "bun --watch src/server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build && bun build src/server/index.ts --outfile=dist/server.js --target=bun",
+    "start": "bun dist/server.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@ag-ui/core": "^0.0.49",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "lucide-react": "^0.511.0",
+    "framer-motion": "^12.7.3",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "@types/uuid": "^10.0.0",
+    "@vitejs/plugin-react": "^4.4.1",
+    "autoprefixer": "^10.4.21",
+    "concurrently": "^9.1.2",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.4",
+    "@tailwindcss/vite": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.2",
+    "vitest": "^3.1.1",
+    "@playwright/test": "^1.52.0"
+  },
+  "keywords": [
+    "ag-ui",
+    "a2a-crews",
+    "dashboard",
+    "multi-agent",
+    "real-time",
+    "sse",
+    "agent-ui",
+    "ai-agents"
+  ]
+}

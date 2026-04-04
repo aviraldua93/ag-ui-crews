@@ -7,3 +7,8 @@ coverage/
 test-results/
 playwright-report/
 .vite/
+
+.a2a-crews-launch-*
+.a2a-crews-prompt-*
+.a2a-crews/
+artifacts/
