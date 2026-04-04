@@ -5,6 +5,7 @@
 import { EventEmitter } from "./event-emitter";
 import { BridgeConnector } from "./bridge-connector";
 import { startSimulation } from "./simulator";
+import { discoverBridges } from "./discovery";
 import { runStarted, runFinished } from "../shared/events";
 import type { ConnectRequest, SimulationConfig } from "../shared/types";
 import { v4 as uuidv4 } from "uuid";
@@ -267,6 +268,11 @@ const server = Bun.serve({
 
     if (pathname === "/api/health" && req.method === "GET") {
       return handleHealth();
+    }
+
+    if (pathname === "/api/discover" && req.method === "GET") {
+      const bridges = await discoverBridges();
+      return jsonResponse({ bridges });
     }
 
     // ── Static files (production) ───────────────────────────────────────────
