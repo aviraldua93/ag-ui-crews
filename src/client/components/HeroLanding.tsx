@@ -16,6 +16,16 @@ interface HeroLandingProps {
   onSimulate: () => void;
 }
 
+function firstSentence(text: string, max = 80): string {
+  const sentence = text.split(/\.\s/)[0];
+  const s = sentence.endsWith(".") ? sentence : sentence + (text.includes(". ") ? "" : "");
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
+function humanizeTeam(team: string): string {
+  return team.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function HeroLanding({ onConnect, onSimulate }: HeroLandingProps) {
   const [bridges, setBridges] = useState<DiscoveredBridge[]>([]);
   const [scanning, setScanning] = useState(true);
@@ -71,10 +81,12 @@ export function HeroLanding({ onConnect, onSimulate }: HeroLandingProps) {
                   <div className="flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-semibold text-gray-100 truncate">{b.scenario || b.team}</span>
+                        <span className="text-sm font-semibold text-gray-100 line-clamp-2">{firstSentence(b.scenario || b.team)}</span>
                         <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${b.tasks.completed === b.tasks.total && b.tasks.total > 0 ? "bg-emerald-500" : "bg-violet-500 animate-pulse"}`} />
                       </div>
                       <div className="flex items-center gap-3 text-xs text-gray-500">
+                        <span className="truncate">{humanizeTeam(b.team)}</span>
+                        <span>·</span>
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{b.agents}</span>
                         <span className="font-mono">{b.tasks.completed}/{b.tasks.total} tasks</span>
                       </div>

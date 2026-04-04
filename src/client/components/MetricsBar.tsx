@@ -28,7 +28,7 @@ export function MetricsBar({ metrics, elapsedTime, wavesDone, wavesTotal }: Metr
   return (
     <div className="rounded-lg bg-gray-900 border border-gray-800 p-4">
       <div className="grid grid-cols-4 gap-2">
-        <Metric value={taskStr} label="Tasks" />
+        <Metric value={taskStr} label="Tasks Done" />
         <Metric value={String(metrics.agentCount)} label="Agents" />
         <Metric value={waveStr} label="Waves" />
         <Metric value={formatElapsed(elapsedTime)} label="Time" />

@@ -1,10 +1,11 @@
-import { X } from "lucide-react";
+import { X, RefreshCw } from "lucide-react";
 import type { DashboardPhase } from "@shared/types";
 
 interface HeaderProps {
   phase: DashboardPhase;
   elapsedTime: number;
   onStop: () => void;
+  onRefresh?: () => void;
   totalTasks?: number;
   completedTasks?: number;
 }
@@ -32,7 +33,7 @@ function phaseText(
   }
 }
 
-export function Header({ phase, elapsedTime, onStop, totalTasks, completedTasks }: HeaderProps) {
+export function Header({ phase, elapsedTime, onStop, onRefresh, totalTasks, completedTasks }: HeaderProps) {
   const isActive = phase !== "idle";
   return (
     <header className="flex items-center justify-between px-4 h-[44px] bg-gray-950 border-b border-gray-800/50 flex-shrink-0">
@@ -41,6 +42,11 @@ export function Header({ phase, elapsedTime, onStop, totalTasks, completedTasks 
       <div className="flex items-center gap-3">
         {isActive && elapsedTime > 0 && (
           <span className="text-xs text-gray-500 font-mono">{formatTime(elapsedTime)}</span>
+        )}
+        {isActive && onRefresh && (
+          <button onClick={onRefresh} className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:text-gray-400 transition-colors" title="Refresh state">
+            <RefreshCw className="w-3 h-3" />
+          </button>
         )}
         {isActive && (
           <button onClick={onStop} className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:text-rose-400 transition-colors" title="Disconnect">

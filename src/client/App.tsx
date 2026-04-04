@@ -1,5 +1,5 @@
-import { useCallback, useMemo } from "react";
-import { useEventStream, connectToBridge, startSimulation, stopSession } from "./hooks/useEventStream";
+import { useCallback, useEffect, useMemo } from "react";
+import { useEventStream, connectToBridge, fetchState, startSimulation, stopSession } from "./hooks/useEventStream";
 import { useCrewState } from "./hooks/useCrewState";
 import { Header } from "./components/Header";
 import { HeroLanding } from "./components/HeroLanding";
@@ -10,6 +10,8 @@ import { ArtifactViewer } from "./components/ArtifactViewer";
 import { EventLog } from "./components/EventLog";
 import { MetricsBar } from "./components/MetricsBar";
 
+const STORAGE_KEY = "ag-ui-crews:bridgeUrl";
+
 export function App() {
   const { state, isConnected, error, connect, reset, dispatch } = useEventStream();
   const { elapsedTime, completionPercent } = useCrewState(state);
@@ -18,11 +20,22 @@ export function App() {
     async (url: string) => {
       try {
         await connectToBridge(url);
+        localStorage.setItem(STORAGE_KEY, url);
         connect();
       } catch { /* SSE handles reconnection */ }
     },
     [connect]
   );
+
+  // Auto-reconnect on page refresh
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved && state.phase === "idle") {
+      handleConnect(saved);
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSimulate = useCallback(async () => {
     try {
@@ -35,8 +48,19 @@ export function App() {
     try {
       await stopSession();
     } catch { /* ignore */ }
+    localStorage.removeItem(STORAGE_KEY);
     reset();
   }, [reset]);
+
+  const handleDisconnect = useCallback(() => {
+    localStorage.removeItem(STORAGE_KEY);
+    reset();
+  }, [reset]);
+
+  const handleRefresh = useCallback(async () => {
+    const snapshot = await fetchState();
+    if (snapshot) dispatch({ type: "STATE_SNAPSHOT", state: snapshot });
+  }, [dispatch]);
 
   const isIdle = state.phase === "idle";
 
@@ -62,6 +86,7 @@ export function App() {
         phase={state.phase}
         elapsedTime={elapsedTime}
         onStop={handleStop}
+        onRefresh={handleRefresh}
         totalTasks={state.metrics.taskCount || state.tasks.length}
         completedTasks={state.metrics.completedTasks}
       />

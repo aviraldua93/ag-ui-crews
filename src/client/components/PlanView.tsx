@@ -12,6 +12,12 @@ const verdictColor: Record<FeasibilityVerdict, string> = {
   "no-go": "text-rose-400 bg-rose-500/10 border-rose-500/20",
 };
 
+function firstSentence(text: string, max = 100): string {
+  const sentence = text.split(/\.\s/)[0];
+  const s = sentence.endsWith(".") ? sentence : sentence;
+  return s.length > max ? s.slice(0, max) + "…" : s;
+}
+
 export function PlanView({ plan, phase }: PlanViewProps) {
   const [expanded, setExpanded] = useState(false);
 
@@ -38,7 +44,7 @@ export function PlanView({ plan, phase }: PlanViewProps) {
         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${verdictColor[v.verdict]}`}>
           {v.verdict.toUpperCase()} {pct}%
         </span>
-        <span className="text-sm text-gray-200 truncate flex-1">{plan.scenario}</span>
+        <span className="text-sm text-gray-200 truncate flex-1">{firstSentence(plan.scenario)}</span>
         <span className="text-[10px] text-gray-600">{expanded ? "\u25B2" : "\u25BC"}</span>
       </button>
       {expanded && (
