@@ -136,6 +136,31 @@ async function findBridgeJsonFiles(): Promise<Array<{ port: number; team: string
     }
   } catch { /* no access to parent */ }
 
+  // Phase 1: Check central bridge registry (~/.a2a-crews/active-bridges/)
+  const homedir = process.env.USERPROFILE ?? process.env.HOME ?? "";
+  if (homedir) {
+    try {
+      const registryDir = join(homedir, ".a2a-crews", "active-bridges");
+      const files = await readdir(registryDir);
+      for (const file of files) {
+        if (!file.endsWith(".json")) continue;
+        try {
+          const content = await readFile(join(registryDir, file), "utf-8");
+          const data = JSON.parse(content);
+          if (data.port && !seen.has(data.port)) {
+            seen.add(data.port);
+            found.push({
+              port: data.port,
+              team: file.replace(".json", ""),
+              scenario: data.scenario ?? file.replace(".json", ""),
+            });
+          }
+        } catch { /* invalid entry */ }
+      }
+    } catch { /* no central registry */ }
+  }
+
+  // Phase 2: Check CWD, parent, and all sibling directories
   for (const dir of searchRoots) {
     try {
       const a2aDir = join(dir, ".a2a-crews");

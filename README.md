@@ -37,26 +37,21 @@ Your AI crew is doing real work — planning tasks, assigning roles, executing i
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/demo-1-landing.png" width="100%" alt="Landing" />
-      <br /><strong>Hero Landing</strong><br />
-      <sub>One click to launch a simulation or connect to a live crew</sub>
+      <img src="docs/screenshots/landing.png" width="100%" alt="Landing" />
+      <br /><strong>Auto-Discovery</strong><br />
+      <sub>Finds running crews automatically — click to connect</sub>
     </td>
     <td align="center">
-      <img src="docs/screenshots/demo-2-planning.png" width="100%" alt="Planning" />
-      <br /><strong>Planning Phase</strong><br />
-      <sub>Feasibility assessment, role assignments, task breakdown by wave</sub>
+      <img src="docs/screenshots/dashboard.png" width="100%" alt="Dashboard" />
+      <br /><strong>Live Dashboard</strong><br />
+      <sub>Real agents, real tasks, real-time metrics from a2a-crews bridge</sub>
     </td>
   </tr>
   <tr>
-    <td align="center">
-      <img src="docs/screenshots/demo-3-executing.png" width="100%" alt="Executing" />
-      <br /><strong>Execution</strong><br />
-      <sub>Agents working in parallel, wave progress, live event stream</sub>
-    </td>
-    <td align="center">
-      <img src="docs/screenshots/demo-4-completed.png" width="100%" alt="Completed" />
-      <br /><strong>Mission Complete</strong><br />
-      <sub>All tasks green, artifacts produced, full metrics summary</sub>
+    <td align="center" colspan="2">
+      <img src="docs/screenshots/metrics.png" width="100%" alt="Metrics" />
+      <br /><strong>Real-Time Metrics</strong><br />
+      <sub>Task completion, agent status, wave progress — all from live bridge polling</sub>
     </td>
   </tr>
 </table>
@@ -235,10 +230,10 @@ The dashboard connects to the [a2a-crews](https://github.com/aviraldua93/a2a-cre
 
 ```mermaid
 flowchart LR
-    Bridge["a2a-crews bridge\n(A2A Protocol)"] -->|"HTTP poll"| Server["Bun Server\n(:4120)"]
-    Sim["Simulator\n(demo mode)"] -->|"events"| Server
-    Server -->|"SSE stream\n(AG-UI events)"| Client["React Dashboard\n(:5173)"]
-    User["👤 You"] -->|"browser"| Client
+    Bridge[a2a-crews bridge] -->|HTTP poll| Server[Bun Server :4120]
+    Sim[Simulator] -->|events| Server
+    Server -->|SSE AG-UI events| Client[React Dashboard :5173]
+    User[You] -->|browser| Client
 
     style Bridge fill:#064e3b,stroke:#10b981,color:#d1fae5
     style Sim fill:#1c1917,stroke:#a8a29e,color:#e7e5e3
