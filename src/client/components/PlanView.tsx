@@ -39,7 +39,7 @@ export function PlanView({ plan, phase }: PlanViewProps) {
   const pct = Math.round(v.confidence * 100);
 
   return (
-    <div className="rounded-lg bg-gray-900 border border-gray-800">
+    <div className="rounded-lg bg-gray-900/80 border border-gray-800 backdrop-blur-sm">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-800/30 transition-colors">
         <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider border ${verdictColor[v.verdict]}`}>
           {v.verdict.toUpperCase()} {pct}%
@@ -52,13 +52,16 @@ export function PlanView({ plan, phase }: PlanViewProps) {
           {plan.roles.length > 0 && (
             <div className="mt-3">
               <h3 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Roles</h3>
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-1.5">
                 {plan.roles.map((role) => (
-                  <div key={role.key} className="flex items-center gap-2 text-xs">
+                  <span
+                    key={role.key}
+                    className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] bg-violet-500/10 text-violet-400 border border-violet-500/20"
+                    title={role.description}
+                  >
                     <span className="w-1.5 h-1.5 rounded-full bg-violet-500 flex-shrink-0" />
-                    <span className="font-mono text-violet-400">{role.key}</span>
-                    <span className="text-gray-600 truncate">{role.description}</span>
-                  </div>
+                    <span className="font-mono">{role.key}</span>
+                  </span>
                 ))}
               </div>
             </div>

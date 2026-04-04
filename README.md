@@ -198,7 +198,7 @@ cd ag-ui-crews && bun install
 bun run dev   # → http://localhost:5173
 ```
 
-Click **"Run Simulation"** and watch a full crew execution unfold — feasibility check, agent registration, wave-by-wave task execution, artifact production, and completion. No agents required.
+The dashboard auto-discovers running crews on your machine. No crews running? Click **"Try a demo"** at the bottom to watch a simulated crew execution — planning, agents, waves, artifacts, and completion. No API keys needed.
 
 > **Prerequisite:** [Bun](https://bun.sh) ≥ 1.0
 
@@ -219,10 +219,12 @@ crews launch
 ```bash
 # Terminal 2 — open the dashboard
 cd ag-ui-crews && bun run dev
-# Click "Connect to Bridge" → paste the bridge URL from crews output
+# → http://localhost:5173 auto-discovers your running crew
 ```
 
-The dashboard connects to the [a2a-crews](https://github.com/aviraldua93/a2a-crews) bridge, polls for state changes, and streams every event to your browser in real time.
+The dashboard auto-discovers running crews via the **central bridge registry** (`~/.a2a-crews/active-bridges/`) and local `.a2a-crews/*/bridge.json` files. Just open the dashboard — your crew card appears with live progress. Click to connect.
+
+> **Works with [a2a-crews](https://github.com/aviraldua93/a2a-crews) v0.2+** which registers bridges in the central registry automatically.
 
 ---
 
@@ -273,6 +275,7 @@ The server runs on port **4120** (configurable via `PORT` env var).
 | `POST` | `/api/connect` | Connect to a live a2a-crews bridge. Body: `{ "bridgeUrl": "http://..." }` |
 | `POST` | `/api/stop` | Stop the current session (bridge or simulation). Resets state. |
 | `GET` | `/api/state` | Current dashboard state as a JSON snapshot. |
+| `GET` | `/api/discover` | Auto-discover running crews. Returns bridges found via central registry + local scan. |
 | `GET` | `/api/health` | Health check — uptime, client count, bridge/simulation status. |
 
 ---
@@ -283,7 +286,7 @@ The server runs on port **4120** (configurable via `PORT` env var).
 |-------|-----------|
 | **Runtime** | [Bun](https://bun.sh) — fast JS runtime, bundler, and test runner |
 | **Frontend** | [React 19](https://react.dev) · [TypeScript](https://www.typescriptlang.org/) (strict) · [Vite 6](https://vite.dev) |
-| **Styling** | [Tailwind CSS 4](https://tailwindcss.com) · [Framer Motion](https://www.framer.com/motion/) |
+| **Styling** | [Tailwind CSS 4](https://tailwindcss.com) |
 | **Protocol** | [AG-UI](https://docs.ag-ui.com) via [`@ag-ui/core`](https://www.npmjs.com/package/@ag-ui/core) |
 | **Testing** | [Vitest](https://vitest.dev) (unit) · [Playwright](https://playwright.dev) (E2E) |
 
@@ -312,7 +315,8 @@ Along the way, we discovered and filed 3 bugs ([#10](https://github.com/aviraldu
 
 ## 🗺 Roadmap
 
-- [ ] Live bridge auto-discovery (scan localhost ports)
+- [x] Live bridge auto-discovery (central registry + local scan)
+- [x] Agent status derived from task assignments (active / completed / idle)
 - [ ] Token cost tracking per agent
 - [ ] Multi-crew dashboard (watch multiple teams simultaneously)
 - [ ] Dark / light theme toggle

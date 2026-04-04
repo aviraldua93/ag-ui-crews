@@ -9,6 +9,7 @@ import { WaveTimeline } from "./components/WaveTimeline";
 import { ArtifactViewer } from "./components/ArtifactViewer";
 import { EventLog } from "./components/EventLog";
 import { MetricsBar } from "./components/MetricsBar";
+import { StatusBar } from "./components/StatusBar";
 
 const STORAGE_KEY = "ag-ui-crews:bridgeUrl";
 
@@ -69,11 +70,16 @@ export function App() {
     [state.waves]
   );
 
+  const activeAgents = useMemo(
+    () => state.agents.filter((a) => a.status === "active").length,
+    [state.agents]
+  );
+
   if (isIdle) {
     return (
       <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
         <header className="flex items-center px-4 h-[44px] bg-gray-950 border-b border-gray-800/50 flex-shrink-0">
-          <span className="text-xs text-gray-600">ag-ui-crews</span>
+          <span className="text-xs font-semibold tracking-wide text-gray-400">ag-ui-crews</span>
         </header>
         <HeroLanding onConnect={handleConnect} onSimulate={handleSimulate} />
       </div>
@@ -90,12 +96,16 @@ export function App() {
         totalTasks={state.metrics.taskCount || state.tasks.length}
         completedTasks={state.metrics.completedTasks}
       />
-      <div className="flex-1 overflow-auto p-4 space-y-3">
+
+      <div className="flex-1 overflow-auto p-3 space-y-3">
+        {/* Main 2-column layout */}
         <div className="grid grid-cols-12 gap-3">
+          {/* Left: Hero area — Waves + Tasks */}
           <div className="col-span-8 space-y-3">
-            <PlanView plan={state.plan} phase={state.phase} />
             <WaveTimeline waves={state.waves} />
           </div>
+
+          {/* Right: Metrics + Agents + Plan */}
           <div className="col-span-4 space-y-3">
             <MetricsBar
               metrics={state.metrics}
@@ -104,11 +114,24 @@ export function App() {
               wavesTotal={state.waves.length}
             />
             <CrewBoard agents={state.agents} />
+            <PlanView plan={state.plan} phase={state.phase} />
           </div>
         </div>
+
+        {/* Full-width: Artifacts + Console */}
         <ArtifactViewer artifacts={state.artifacts} />
         <EventLog events={state.eventLog} />
       </div>
+
+      <StatusBar
+        isConnected={isConnected}
+        agentCount={state.agents.length}
+        activeAgents={activeAgents}
+        completedTasks={state.metrics.completedTasks}
+        totalTasks={state.metrics.taskCount || state.tasks.length}
+        wavesDone={wavesDone}
+        wavesTotal={state.waves.length}
+      />
     </div>
   );
 }
