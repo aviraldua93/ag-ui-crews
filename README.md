@@ -1,3 +1,5 @@
+<p align="center"><img src="hero.svg" alt="AG-UI Crews Hero" width="800" /></p>
+
 <div align="center">
 
 # 🎯 ag-ui-crews
