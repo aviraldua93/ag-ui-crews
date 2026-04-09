@@ -1,4 +1,5 @@
-import { X, RefreshCw } from "lucide-react";
+import { X, RefreshCw, Sun, Moon } from "lucide-react";
+import { useTheme } from "../hooks/useTheme";
 import type { DashboardPhase } from "@shared/types";
 
 interface HeaderProps {
@@ -47,6 +48,7 @@ export function Header({
   totalTasks,
   completedTasks,
 }: HeaderProps) {
+  const { theme, toggleTheme } = useTheme();
   const isActive = phase !== "idle";
   const pct =
     totalTasks && totalTasks > 0
@@ -56,7 +58,7 @@ export function Header({
 
   return (
     <header className="flex-shrink-0 relative">
-      <div className="flex items-center justify-between px-4 h-[44px] bg-gray-950 border-b border-gray-800/50">
+      <div className="flex items-center justify-between px-4 h-[44px] bg-gray-100 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800/50">
         {/* Left: logo */}
         <span className="text-xs font-semibold tracking-wide text-gray-400">
           ag-ui-crews
@@ -79,6 +81,14 @@ export function Header({
 
         {/* Right: time + controls */}
         <div className="flex items-center gap-3">
+          <button
+            data-testid="theme-toggle"
+            onClick={toggleTheme}
+            className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:text-gray-400 transition-colors"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+          </button>
           {isActive && elapsedTime > 0 && (
             <span className="text-[11px] text-gray-500 font-mono tabular-nums">
               {formatTime(elapsedTime)}

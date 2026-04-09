@@ -7,117 +7,110 @@ import { test, expect, type Page } from "@playwright/test";
  *   idle (hero) → planning → executing → completed
  *
  * The simulation uses the server's built-in simulator with staggered events
- * delivered via SSE. The speedMultiplier is set to 10x to keep tests fast.
+ * delivered via SSE. A fetch override injects speedMultiplier=10 to keep tests fast.
  */
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
-/** Start simulation via API with a fast speed multiplier */
-async function triggerSimulationViaApi(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    await fetch("/api/simulate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        scenario: "Build a landing page",
-        agentCount: 4,
-        waveCount: 3,
-        speedMultiplier: 10,
-        failureRate: 0,
-      }),
-    });
+/**
+ * Inject a fetch override so the "Try a demo" click uses a 10× speed simulation.
+ * Must be called BEFORE clicking the button.
+ */
+async function injectFastSimConfig(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const orig = window.fetch.bind(window);
+    window.fetch = async (input: any, init?: any) => {
+      if (typeof input === "string" && input.includes("/api/simulate")) {
+        return orig(input, {
+          ...init,
+          body: JSON.stringify({
+            scenario: "Build a landing page",
+            agentCount: 4,
+            waveCount: 3,
+            speedMultiplier: 10,
+            failureRate: 0,
+          }),
+        });
+      }
+      return orig(input, init);
+    };
   });
 }
 
-/** Stop the current session via API */
-async function stopViaApi(page: Page): Promise<void> {
-  await page.evaluate(async () => {
-    await fetch("/api/stop", { method: "POST" });
-  });
+/** Click "Try a demo" (with fast-sim override) and wait for the dashboard to render */
+async function startFastSim(page: Page): Promise<void> {
+  await injectFastSimConfig(page);
+  const btn = page.locator("button", { hasText: /try a demo/i });
+  await expect(btn).toBeVisible({ timeout: 10_000 });
+  await btn.click();
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────────
 
 test.describe("Simulation Mode Dashboard", () => {
   test.beforeEach(async ({ page }) => {
+    // Navigate first so page.evaluate has a proper context
+    await page.goto("/");
     // Ensure clean state before each test
-    await stopViaApi(page).catch(() => {});
+    await page.evaluate(async () => {
+      localStorage.removeItem("ag-ui-crews:bridgeUrl");
+      await fetch("/api/stop", { method: "POST" }).catch(() => {});
+    });
+    await page.waitForTimeout(300);
     await page.goto("/");
     await page.waitForLoadState("networkidle");
   });
 
   test.afterEach(async ({ page }) => {
     // Clean up: stop any running simulation
-    await stopViaApi(page).catch(() => {});
+    await page.evaluate(async () => {
+      localStorage.removeItem("ag-ui-crews:bridgeUrl");
+      await fetch("/api/stop", { method: "POST" }).catch(() => {});
+    }).catch(() => {});
   });
 
   test("hero landing is shown in idle state", async ({ page }) => {
-    // The hero landing should be visible with the app title and action buttons
+    // The hero landing should be visible with the app title and "Try a demo" button
     await expect(page.locator("text=ag-ui-crews").first()).toBeVisible();
-    await expect(page.locator("text=Mission Control")).toBeVisible();
-    await expect(page.locator("text=Run Simulation")).toBeVisible();
-    await expect(page.locator("text=Connect to Bridge")).toBeVisible();
+    await expect(
+      page.locator("button", { hasText: /try a demo/i }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("clicking Simulate transitions from hero to dashboard", async ({
+  test("clicking Try a demo transitions from hero to dashboard", async ({
     page,
   }) => {
-    // Verify hero is visible initially
-    await expect(page.locator("text=Run Simulation")).toBeVisible();
+    await startFastSim(page);
 
-    // Click the header Simulate button (more reliable than hero button)
-    const simulateButton = page.locator("button", {
-      hasText: "Simulate",
-    });
-    await simulateButton.first().click();
-
-    // Hero should disappear and dashboard should render
-    // The phase should move away from idle
-    await expect(page.locator("text=Mission Control")).toBeHidden({
-      timeout: 10_000,
-    });
-
-    // Dashboard panels should appear — wait for PlanView or WaveTimeline
+    // Dashboard panels should appear — wait for Timeline section
     await expect(
-      page.locator("text=Wave Timeline").first()
+      page.locator("text=Timeline").first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
   test("simulation transitions through planning → executing → completed", async ({
     page,
   }) => {
-    // Start simulation via UI
-    const simulateButton = page.locator("button", {
-      hasText: "Simulate",
-    });
-    await simulateButton.first().click();
+    await startFastSim(page);
 
-    // ── Planning phase ──────────────────────────────────────────────────────
-    // The phase badge should show "Planning" or "Connecting" briefly
-    // Wait for the PlanView to appear (skeleton or actual plan)
+    // ── Planning/Executing phase ────────────────────────────────────────────
     await expect(
-      page
-        .locator("text=Wave Timeline")
-        .or(page.locator("text=Task Flow"))
-        .first()
+      page.locator("text=Timeline").first(),
     ).toBeVisible({ timeout: 15_000 });
 
-    // ── Executing phase ─────────────────────────────────────────────────────
-    // After plan completes, waves should appear and show activity
-    // Look for wave cards with "Wave 1" text
+    // After plan completes, waves should appear
     await expect(page.locator("text=Wave 1").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // CrewBoard should show agent status cards
-    await expect(page.locator("text=Crew Board").first()).toBeVisible();
+    // Agents section should show agent status cards
+    await expect(page.locator("text=Agents").first()).toBeVisible();
 
-    // Metrics section should be visible
-    await expect(page.locator("text=Metrics").first()).toBeVisible();
+    // Task metrics should be visible (e.g. "0/6 Tasks")
+    await expect(page.locator("text=Tasks").first()).toBeVisible();
 
     // ── Completed phase ─────────────────────────────────────────────────────
-    // Wait for simulation to finish — phase badge should show "Completed"
-    await expect(page.locator("text=Completed").first()).toBeVisible({
+    await expect(page.locator("text=Complete").first()).toBeVisible({
       timeout: 30_000,
     });
   });
@@ -125,18 +118,14 @@ test.describe("Simulation Mode Dashboard", () => {
   test("PlanView renders scenario and roles during planning", async ({
     page,
   }) => {
-    // Start simulation via API for speed (10x multiplier, 0 failures)
-    // First connect SSE stream by clicking Simulate
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+    await startFastSim(page);
 
     // Wait for plan to be visible — the PlanView renders the scenario
-    // The simulator scenario is "Build a landing page"
     await expect(
       page
         .locator("text=Build a landing page")
         .or(page.locator("text=Build a REST API"))
-        .first()
+        .first(),
     ).toBeVisible({ timeout: 15_000 });
 
     // Roles should be displayed (architect, backend-dev, frontend-dev, reviewer)
@@ -153,118 +142,100 @@ test.describe("Simulation Mode Dashboard", () => {
   test("WaveTimeline shows active waves during execution", async ({
     page,
   }) => {
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+    await startFastSim(page);
 
     // Wait for waves to appear
     await expect(page.locator("text=Wave 1").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // Wave Timeline header should be present
+    // Timeline header should be present
     await expect(
-      page.locator("text=Wave Timeline").first()
+      page.locator("text=Timeline").first(),
     ).toBeVisible();
 
     // Tasks inside waves should show titles
-    // The simulator creates tasks like "Design system architecture"
     await expect(
       page
         .locator("text=Design system architecture")
         .or(page.locator("text=Implement REST API"))
-        .first()
+        .first(),
     ).toBeVisible({ timeout: 10_000 });
   });
 
   test("CrewBoard shows agent status cards", async ({ page }) => {
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+    await startFastSim(page);
 
-    // Wait for agents to register — CrewBoard should show agent names
-    await expect(page.locator("text=Crew Board").first()).toBeVisible({
+    // Wait for agents to register — Agents section should show names
+    await expect(page.locator("text=Agents").first()).toBeVisible({
       timeout: 15_000,
     });
 
     // Agent cards should appear with role names
-    // The simulator registers: architect, backend-dev, frontend-dev, reviewer
     await expect(page.locator("text=architect").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // Agent status badges should be visible (idle, active, completed)
-    // Wait for at least one agent to be in a non-idle state
+    // Agent status badges should be visible
     await expect(
       page
         .locator("text=active")
         .or(page.locator("text=completed"))
-        .first()
+        .first(),
     ).toBeVisible({ timeout: 15_000 });
   });
 
   test("MetricsBar shows task counts after simulation completes", async ({
     page,
   }) => {
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+    await startFastSim(page);
 
     // Wait for simulation to complete
-    await expect(page.locator("text=Completed").first()).toBeVisible({
+    await expect(page.locator("text=Complete").first()).toBeVisible({
       timeout: 30_000,
     });
 
-    // MetricsBar should be visible with various metrics
-    await expect(page.locator("text=Metrics").first()).toBeVisible();
-
-    // Tasks stat should show completion (e.g. "6/6" or similar)
+    // MetricsBar pills should show task, agent, and wave counts
     await expect(page.locator("text=Tasks").first()).toBeVisible();
-
-    // Agents count should be visible
     await expect(page.locator("text=Agents").first()).toBeVisible();
-
-    // Waves count should show
     await expect(page.locator("text=Waves").first()).toBeVisible();
   });
 
   test("ArtifactViewer lists produced artifacts after simulation", async ({
     page,
   }) => {
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+    await startFastSim(page);
 
     // Wait for simulation to complete
-    await expect(page.locator("text=Completed").first()).toBeVisible({
+    await expect(page.locator("text=Complete").first()).toBeVisible({
       timeout: 30_000,
     });
 
     // Artifacts section should be visible
     await expect(page.locator("text=Artifacts").first()).toBeVisible();
 
-    // Artifact tabs should show filenames produced by the simulator
-    // The simulator produces: design.md, implement-api.md, implement-ui.md, review.md, test.md, integrate.md
+    // Artifact tabs should show filenames
     await expect(page.locator("text=design.md").first()).toBeVisible({
       timeout: 15_000,
     });
   });
 
-  test("clicking Stop returns to idle/hero state", async ({ page }) => {
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
+  test("clicking Disconnect returns to idle/hero state", async ({ page }) => {
+    await startFastSim(page);
 
-    // Wait for dashboard to render (not idle anymore)
+    // Wait for dashboard to render
     await expect(
-      page.locator("text=Wave Timeline").first()
+      page.locator("text=Timeline").first(),
     ).toBeVisible({ timeout: 15_000 });
 
-    // Click Stop button in the header
-    const stopButton = page.locator("button", { hasText: "Stop" });
-    await stopButton.click();
+    // Click the Disconnect button (X icon) in the header
+    const disconnectBtn = page.locator('button[title="Disconnect"]');
+    await expect(disconnectBtn).toBeVisible();
+    await disconnectBtn.click();
 
     // Should return to hero/idle state
-    await expect(page.locator("text=Run Simulation").first()).toBeVisible({
-      timeout: 10_000,
-    });
     await expect(
-      page.locator("text=Mission Control").first()
+      page.locator("button", { hasText: /try a demo/i }),
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -272,40 +243,35 @@ test.describe("Simulation Mode Dashboard", () => {
     page,
   }) => {
     // ── 1. Start in idle ────────────────────────────────────────────────────
-    await expect(page.locator("text=Run Simulation")).toBeVisible();
-
-    // ── 2. Click Simulate ───────────────────────────────────────────────────
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await simulateBtn.first().click();
-
-    // ── 3. Dashboard should appear (hero disappears) ────────────────────────
-    await expect(page.locator("text=Mission Control")).toBeHidden({
-      timeout: 10_000,
-    });
-
-    // ── 4. Planning/Executing: dashboard panels render ──────────────────────
-    // WaveTimeline and CrewBoard always render once we leave idle
     await expect(
-      page.locator("text=Wave Timeline").first()
+      page.locator("button", { hasText: /try a demo/i }),
+    ).toBeVisible({ timeout: 10_000 });
+
+    // ── 2. Click Try a demo ─────────────────────────────────────────────────
+    await startFastSim(page);
+
+    // ── 3. Dashboard panels render ──────────────────────────────────────────
+    await expect(
+      page.locator("text=Timeline").first(),
     ).toBeVisible({ timeout: 15_000 });
 
-    await expect(page.locator("text=Crew Board").first()).toBeVisible({
+    await expect(page.locator("text=Agents").first()).toBeVisible({
       timeout: 15_000,
     });
 
-    // ── 5. Completed: phase badge, metrics, and artifacts ───────────────────
-    await expect(page.locator("text=Completed").first()).toBeVisible({
+    // ── 4. Completed: phase badge, metrics, and artifacts ───────────────────
+    await expect(page.locator("text=Complete").first()).toBeVisible({
       timeout: 30_000,
     });
     await expect(page.locator("text=Artifacts").first()).toBeVisible();
     await expect(page.locator("text=Tasks").first()).toBeVisible();
 
-    // ── 6. Stop → back to idle ──────────────────────────────────────────────
-    const stopButton = page.locator("button", { hasText: "Stop" });
-    await stopButton.click();
+    // ── 5. Disconnect → back to idle ────────────────────────────────────────
+    const disconnectBtn = page.locator('button[title="Disconnect"]');
+    await disconnectBtn.click();
 
-    await expect(page.locator("text=Run Simulation").first()).toBeVisible({
-      timeout: 10_000,
-    });
+    await expect(
+      page.locator("button", { hasText: /try a demo/i }),
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

@@ -266,7 +266,7 @@ export function EventLog({ events }: EventLogProps) {
       <div className="flex items-center justify-between px-4 py-2 border-b border-gray-800 flex-shrink-0">
         <button onClick={() => setCollapsed(!collapsed)} className="flex items-center gap-2">
           <h2 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Console</h2>
-          <span className="text-[10px] text-gray-700 font-mono">{filtered.length}</span>
+          <span data-testid="event-log-count" className="text-[10px] text-gray-700 font-mono">{filtered.length}</span>
           <span className="text-[10px] text-gray-700">{collapsed ? "\u25BC" : "\u25B2"}</span>
         </button>
         {!collapsed && (

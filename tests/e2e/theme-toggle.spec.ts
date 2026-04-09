@@ -57,7 +57,7 @@ test.describe("Theme Toggle", () => {
 
     // Capture dark mode background
     const darkBg = await header.evaluate(
-      (el) => getComputedStyle(el).backgroundColor
+      (el) => getComputedStyle(el).backgroundColor,
     );
 
     // Switch to light
@@ -69,7 +69,7 @@ test.describe("Theme Toggle", () => {
 
     // Capture light mode background
     const lightBg = await header.evaluate(
-      (el) => getComputedStyle(el).backgroundColor
+      (el) => getComputedStyle(el).backgroundColor,
     );
 
     // The backgrounds must differ between dark and light themes
@@ -86,7 +86,7 @@ test.describe("Theme Toggle", () => {
 
     // Verify localStorage was set
     const stored = await page.evaluate(() =>
-      localStorage.getItem("ag-ui-crews-theme")
+      localStorage.getItem("ag-ui-crews-theme"),
     );
     expect(stored).toBe("light");
 
@@ -99,7 +99,7 @@ test.describe("Theme Toggle", () => {
 
     // localStorage should still hold "light"
     const storedAfter = await page.evaluate(() =>
-      localStorage.getItem("ag-ui-crews-theme")
+      localStorage.getItem("ag-ui-crews-theme"),
     );
     expect(storedAfter).toBe("light");
   });
@@ -115,14 +115,9 @@ test.describe("Theme Toggle", () => {
     // App title should be visible
     await expect(page.locator("text=ag-ui-crews").first()).toBeVisible();
 
-    // Hero landing should be visible in idle state — current text after redesign
-    await expect(
-      page.locator("text=Waiting for crews").first()
-    ).toBeVisible({ timeout: 10_000 });
-
-    // Buttons should be functional
-    const simulateBtn = page.locator("button", { hasText: "Simulate" });
-    await expect(simulateBtn.first()).toBeVisible();
-    await expect(simulateBtn.first()).toBeEnabled();
+    // "Try a demo" button should be visible and functional
+    const demoBtn = page.locator("button", { hasText: /try a demo/i });
+    await expect(demoBtn).toBeVisible({ timeout: 10_000 });
+    await expect(demoBtn).toBeEnabled();
   });
 });
