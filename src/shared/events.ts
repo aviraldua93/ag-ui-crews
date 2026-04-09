@@ -494,6 +494,38 @@ export function translateToAgUi(event: DashboardEvent): AgUiEvent[] {
         )
       );
       break;
+
+    case "WORKTREE_CREATED":
+      events.push(
+        ...textMessage(
+          `🌿 Worktree created: ${event.data.branch} for ${event.data.agentName}`
+        )
+      );
+      break;
+
+    case "WORKTREE_MERGED":
+      events.push(
+        ...textMessage(
+          `✅ Worktree merged: ${event.data.branch} by ${event.data.agentName}`
+        )
+      );
+      break;
+
+    case "WORKTREE_CONFLICT":
+      events.push(
+        ...textMessage(
+          `🔴 Merge conflict: ${event.data.branch} for ${event.data.agentName}`
+        )
+      );
+      break;
+
+    case "WORKTREE_REMOVED":
+      events.push(
+        ...textMessage(
+          `🧹 Worktree removed: ${event.data.branch} for ${event.data.agentName}`
+        )
+      );
+      break;
   }
 
   // Always emit the custom event too for dashboard-specific handling

@@ -349,6 +349,72 @@ export interface CrewPlan {
   waves: PlanTask[][];
 }
 
+// ─── Worktree Types ────────────────────────────────────────────────────────────
+
+/**
+ * Lifecycle status of a git worktree used by an agent.
+ *
+ * Worktrees progress through these statuses as agents work in isolation
+ * and merge their changes back:
+ *
+ * ```
+ * active → merging → merged → cleaned
+ *                  ↘ conflict
+ * ```
+ *
+ * | Value        | Description                                                     |
+ * |--------------|-----------------------------------------------------------------|
+ * | `"active"`   | Agent is actively working in this worktree.                     |
+ * | `"merging"`  | Agent's work is being merged back to the main branch.           |
+ * | `"merged"`   | Merge completed successfully.                                   |
+ * | `"conflict"` | Merge conflict detected; manual resolution needed.              |
+ * | `"cleaned"`  | Worktree has been removed after a successful merge.             |
+ *
+ * @see {@link WorktreeStatus} — the full worktree state record.
+ */
+export type WorktreeStatusValue =
+  | "active"
+  | "merging"
+  | "merged"
+  | "conflict"
+  | "cleaned";
+
+/**
+ * Runtime state of a git worktree assigned to an agent.
+ *
+ * Each agent in the crew may operate in its own worktree to enable parallel
+ * development without branch conflicts.  The dashboard tracks worktree
+ * lifecycle via `WORKTREE_*` {@link DashboardEvent}s.
+ *
+ * @see {@link DashboardState.worktrees} — the array that holds these records.
+ *
+ * @example
+ * ```ts
+ * const wt: WorktreeStatus = {
+ *   agentName: "backend-dev",
+ *   branch: "agent/backend-dev",
+ *   path: "/project/.worktrees/backend-dev",
+ *   status: "active",
+ *   filesChanged: 4,
+ *   createdAt: "2025-06-01T12:00:00Z",
+ * };
+ * ```
+ */
+export interface WorktreeStatus {
+  /** Name of the agent working in this worktree (matches {@link AgentState.name}). */
+  agentName: string;
+  /** Git branch name used by this worktree (e.g. `"agent/backend-dev"`). */
+  branch: string;
+  /** Filesystem path to the worktree directory. */
+  path: string;
+  /** Current lifecycle status of the worktree. */
+  status: WorktreeStatusValue;
+  /** Number of files changed in this worktree, if known. */
+  filesChanged?: number;
+  /** ISO 8601 timestamp when the worktree was created. */
+  createdAt: string;
+}
+
 // ─── Dashboard State ───────────────────────────────────────────────────────────
 
 /**
@@ -642,6 +708,8 @@ export interface DashboardState {
   tasks: TaskState[];
   /** Artifacts produced by agents during execution. */
   artifacts: Artifact[];
+  /** Current state of every agent worktree. */
+  worktrees: WorktreeStatus[];
   /** Aggregate execution metrics for the current run. */
   metrics: CrewMetrics;
   /** Chronological log of all {@link DashboardEvent}s received during the session. */
@@ -689,6 +757,12 @@ export interface DashboardState {
  * **Artifact events:**
  * - `"ARTIFACT_PRODUCED"` — An agent produced an output artifact.
  *
+ * **Worktree events:**
+ * - `"WORKTREE_CREATED"`  — A new git worktree was created for an agent.
+ * - `"WORKTREE_MERGED"`   — An agent's worktree was merged back to main.
+ * - `"WORKTREE_CONFLICT"` — A merge conflict was detected in an agent's worktree.
+ * - `"WORKTREE_REMOVED"`  — A worktree was cleaned up after merge.
+ *
  * **Infrastructure events:**
  * - `"BRIDGE_CONNECTED"`    — Successfully connected to a live bridge.
  * - `"BRIDGE_DISCONNECTED"` — Lost connection to the live bridge.
@@ -716,6 +790,10 @@ export type DashboardEventType =
   | "TASK_FAILED"
   | "TASK_RETRYING"
   | "ARTIFACT_PRODUCED"
+  | "WORKTREE_CREATED"
+  | "WORKTREE_MERGED"
+  | "WORKTREE_CONFLICT"
+  | "WORKTREE_REMOVED"
   | "BRIDGE_CONNECTED"
   | "BRIDGE_DISCONNECTED"
   | "METRICS_UPDATE"
@@ -897,6 +975,7 @@ export const INITIAL_DASHBOARD_STATE: DashboardState = {
   waves: [],
   tasks: [],
   artifacts: [],
+  worktrees: [],
   metrics: { ...INITIAL_METRICS },
   eventLog: [],
   error: null,

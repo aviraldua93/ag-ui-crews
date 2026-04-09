@@ -10,6 +10,8 @@ import type {
   CrewPlan,
   CrewMetrics,
   SimulationConfig,
+  WorktreeStatus,
+  WorktreeStatusValue,
 } from "@shared/types";
 import { INITIAL_DASHBOARD_STATE } from "@shared/types";
 import type { AgUiEvent } from "@shared/events";
@@ -320,6 +322,55 @@ function reducer(state: DashboardState, action: Action): DashboardState {
 
         case "BRIDGE_DISCONNECTED":
           return { ...state, eventLog };
+
+        case "WORKTREE_CREATED": {
+          const wt: WorktreeStatus = {
+            agentName: data.agentName as string,
+            branch: data.branch as string,
+            path: data.path as string,
+            status: "active",
+            filesChanged: (data.filesChanged as number | undefined) ?? 0,
+            createdAt: data.createdAt as string ?? new Date().toISOString(),
+          };
+          return {
+            ...state,
+            eventLog,
+            worktrees: [...state.worktrees, wt],
+          };
+        }
+
+        case "WORKTREE_MERGED": {
+          const agentName = data.agentName as string;
+          return {
+            ...state,
+            eventLog,
+            worktrees: state.worktrees.map((w) =>
+              w.agentName === agentName ? { ...w, status: "merged" as WorktreeStatusValue, filesChanged: (data.filesChanged as number | undefined) ?? w.filesChanged } : w
+            ),
+          };
+        }
+
+        case "WORKTREE_CONFLICT": {
+          const agentName = data.agentName as string;
+          return {
+            ...state,
+            eventLog,
+            worktrees: state.worktrees.map((w) =>
+              w.agentName === agentName ? { ...w, status: "conflict" as WorktreeStatusValue } : w
+            ),
+          };
+        }
+
+        case "WORKTREE_REMOVED": {
+          const agentName = data.agentName as string;
+          return {
+            ...state,
+            eventLog,
+            worktrees: state.worktrees.map((w) =>
+              w.agentName === agentName ? { ...w, status: "cleaned" as WorktreeStatusValue } : w
+            ),
+          };
+        }
 
         case "STATE_SNAPSHOT":
           // Full state replacement if data.state exists

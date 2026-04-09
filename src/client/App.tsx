@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo } from "react";
+import { Sun, Moon } from "lucide-react";
 import { useEventStream, connectToBridge, fetchState, startSimulation, stopSession } from "./hooks/useEventStream";
 import { useCrewState } from "./hooks/useCrewState";
+import { useTheme } from "./hooks/useTheme";
 import { Header } from "./components/Header";
 import { HeroLanding } from "./components/HeroLanding";
 import { PlanView } from "./components/PlanView";
@@ -10,12 +12,14 @@ import { ArtifactViewer } from "./components/ArtifactViewer";
 import { EventLog } from "./components/EventLog";
 import { MetricsBar } from "./components/MetricsBar";
 import { StatusBar } from "./components/StatusBar";
+import { WorktreePanel } from "./components/WorktreePanel";
 
 const STORAGE_KEY = "ag-ui-crews:bridgeUrl";
 
 export function App() {
   const { state, isConnected, error, connect, reset, dispatch } = useEventStream();
   const { elapsedTime, completionPercent } = useCrewState(state);
+  const { theme, toggleTheme } = useTheme();
 
   const handleConnect = useCallback(
     async (url: string) => {
@@ -77,9 +81,17 @@ export function App() {
 
   if (isIdle) {
     return (
-      <div className="flex flex-col h-screen bg-gray-950 text-gray-100">
-        <header className="flex items-center px-4 h-[44px] bg-gray-950 border-b border-gray-800/50 flex-shrink-0">
+      <div className="flex flex-col h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+        <header className="flex items-center justify-between px-4 h-[44px] bg-gray-100 dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800/50 flex-shrink-0">
           <span className="text-xs font-semibold tracking-wide text-gray-400">ag-ui-crews</span>
+          <button
+            data-testid="theme-toggle"
+            onClick={toggleTheme}
+            className="w-6 h-6 rounded flex items-center justify-center text-gray-600 hover:text-gray-400 transition-colors"
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+          >
+            {theme === "dark" ? <Sun className="w-3 h-3" /> : <Moon className="w-3 h-3" />}
+          </button>
         </header>
         <HeroLanding onConnect={handleConnect} onSimulate={handleSimulate} />
       </div>
@@ -114,6 +126,7 @@ export function App() {
               wavesTotal={state.waves.length}
             />
             <CrewBoard agents={state.agents} />
+            <WorktreePanel worktrees={state.worktrees} />
             <PlanView plan={state.plan} phase={state.phase} />
           </div>
         </div>

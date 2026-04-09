@@ -32,6 +32,7 @@ import type {
   TaskState,
   Artifact,
   CrewPlan,
+  WorktreeStatus,
 } from "../shared/types";
 import {
   INITIAL_DASHBOARD_STATE,
@@ -235,6 +236,10 @@ export class EventEmitter {
    * | `TASK_FAILED`         | Sets task status → `"failed"`, records `completedAt`, increments `metrics.failedTasks`. |
    * | `TASK_RETRYING`       | Resets task status → `"submitted"`, increments task and global `retryCount`. |
    * | `ARTIFACT_PRODUCED`   | Pushes a new {@link Artifact} to `state.artifacts`. |
+   * | `WORKTREE_CREATED`    | Pushes a new {@link WorktreeStatus} with status `"active"`. |
+   * | `WORKTREE_MERGED`     | Sets worktree status → `"merged"`, updates `filesChanged`. |
+   * | `WORKTREE_CONFLICT`   | Sets worktree status → `"conflict"`. |
+   * | `WORKTREE_REMOVED`    | Sets worktree status → `"cleaned"`. |
    * | `METRICS_UPDATE`      | Merges partial metric overrides (`totalTime`, `completedTasks`, `failedTasks`). |
    * | `STATE_SNAPSHOT`      | Full state replacement (if `data.state`) or partial phase update (if `data.phase`), preserving `eventLog`. |
    *
@@ -442,6 +447,45 @@ export class EventEmitter {
           producedAt: event.timestamp,
         };
         this.state.artifacts.push(artifact);
+        break;
+      }
+
+      case "WORKTREE_CREATED": {
+        const wt: WorktreeStatus = {
+          agentName: event.data.agentName as string,
+          branch: event.data.branch as string,
+          path: event.data.path as string,
+          status: "active",
+          filesChanged: (event.data.filesChanged as number | undefined) ?? 0,
+          createdAt: (event.data.createdAt as string) ?? new Date().toISOString(),
+        };
+        this.state.worktrees.push(wt);
+        break;
+      }
+
+      case "WORKTREE_MERGED": {
+        const agentName = event.data.agentName as string;
+        const wt = this.state.worktrees.find((w) => w.agentName === agentName);
+        if (wt) {
+          wt.status = "merged";
+          if (event.data.filesChanged !== undefined) {
+            wt.filesChanged = event.data.filesChanged as number;
+          }
+        }
+        break;
+      }
+
+      case "WORKTREE_CONFLICT": {
+        const agentName = event.data.agentName as string;
+        const wt = this.state.worktrees.find((w) => w.agentName === agentName);
+        if (wt) wt.status = "conflict";
+        break;
+      }
+
+      case "WORKTREE_REMOVED": {
+        const agentName = event.data.agentName as string;
+        const wt = this.state.worktrees.find((w) => w.agentName === agentName);
+        if (wt) wt.status = "cleaned";
         break;
       }
 
